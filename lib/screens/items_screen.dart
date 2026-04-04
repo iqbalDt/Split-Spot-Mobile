@@ -9,7 +9,8 @@ class ItemsScreen extends StatefulWidget {
   final String? googleMapsLink;
   final List<Participant>? participants;
 
-  ItemsScreen({
+  const ItemsScreen({
+    super.key,
     this.eventName,
     this.location,
     this.date,
@@ -25,17 +26,123 @@ class _ItemsScreenState extends State<ItemsScreen> {
   final List<MenuItem> items = [];
   final TextEditingController nameController = TextEditingController();
   final TextEditingController priceController = TextEditingController();
+  final TextEditingController taxController = TextEditingController(text: '11');
+  List<String> selectedParticipants = [];
+  int currentQuantity = 1;
+  bool isTaxEnabled = false;
+  double customTaxPercent = 11.0;
 
   int totalMenuPrice = 0;
 
   void _updateTotal() {
     int total = 0;
     for (var item in items) {
-      total += item.priceWithTax;
+      // Only sum base price (no tax) for subtotal display
+      total += item.totalPrice;
     }
     setState(() {
       totalMenuPrice = total;
     });
+  }
+
+  /// Parse and validate tax percentage input
+  /// Returns true if valid, false otherwise
+  bool _validateAndUpdateTax(String value) {
+    if (value.isEmpty) {
+      setState(() {
+        customTaxPercent = 0.0;
+      });
+      return true;
+    }
+
+    try {
+      final taxValue = double.parse(value);
+      if (taxValue < 0 || taxValue > 100) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Pajak harus antara 0-100%'),
+            backgroundColor: Colors.red,
+            duration: Duration(milliseconds: 1500),
+          ),
+        );
+        return false;
+      }
+      setState(() {
+        customTaxPercent = taxValue;
+      });
+      return true;
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Masukkan angka yang valid'),
+          backgroundColor: Colors.red,
+          duration: Duration(milliseconds: 1500),
+        ),
+      );
+      return false;
+    }
+  }
+
+  /// Show dialog to select multiple participants
+  void _showParticipantSelector() {
+    if (widget.participants == null || widget.participants!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Tambahkan peserta terlebih dahulu'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Pilih Pemesan'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: widget.participants!.map((participant) {
+              return CheckboxListTile(
+                title: Text(participant.name),
+                subtitle: Text(
+                  participant.phoneNumber,
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                value: selectedParticipants.contains(participant.name),
+                onChanged: (isChecked) {
+                  setState(() {
+                    if (isChecked == true) {
+                      if (!selectedParticipants.contains(participant.name)) {
+                        selectedParticipants.add(participant.name);
+                      }
+                    } else {
+                      selectedParticipants.remove(participant.name);
+                    }
+                  });
+                },
+              );
+            }).toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Batal'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+            ),
+            child: Text(
+              'Selesai',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -54,6 +161,13 @@ class _ItemsScreenState extends State<ItemsScreen> {
                 onTap: () {
                   setState(() {
                     items.clear();
+                    nameController.clear();
+                    priceController.clear();
+                    taxController.text = '11';
+                    selectedParticipants.clear();
+                    currentQuantity = 1;
+                    isTaxEnabled = false;
+                    customTaxPercent = 11.0;
                     _updateTotal();
                   });
                 },
@@ -211,7 +325,13 @@ class _ItemsScreenState extends State<ItemsScreen> {
                             children: [
                               Expanded(
                                 child: GestureDetector(
-                                  onTap: () {},
+                                  onTap: () {
+                                    setState(() {
+                                      if (currentQuantity > 1) {
+                                        currentQuantity--;
+                                      }
+                                    });
+                                  },
                                   child: Center(
                                     child: Text(
                                       '−',
@@ -223,7 +343,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
                               Expanded(
                                 child: Center(
                                   child: Text(
-                                    '1',
+                                    '$currentQuantity',
                                     style: TextStyle(
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -232,7 +352,11 @@ class _ItemsScreenState extends State<ItemsScreen> {
                               ),
                               Expanded(
                                 child: GestureDetector(
-                                  onTap: () {},
+                                  onTap: () {
+                                    setState(() {
+                                      currentQuantity++;
+                                    });
+                                  },
                                   child: Center(
                                     child: Text(
                                       '+',
@@ -251,51 +375,9 @@ class _ItemsScreenState extends State<ItemsScreen> {
               ),
               SizedBox(height: 16),
 
-              // Tax/Service
-              Container(
-                padding: EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey[300]!),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.receipt_long, color: Colors.green),
-                        SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Pajak / Service',
-                              style: TextStyle(fontWeight: FontWeight.w600),
-                            ),
-                            Text(
-                              'Tambahkan 11% pajak',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    Switch(
-                      value: false,
-                      onChanged: (value) {},
-                      activeColor: Colors.green,
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(height: 16),
-
               // Pilih Pemesan
               GestureDetector(
-                onTap: () {},
+                onTap: _showParticipantSelector,
                 child: Container(
                   padding: EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -318,7 +400,9 @@ class _ItemsScreenState extends State<ItemsScreen> {
                                 style: TextStyle(fontWeight: FontWeight.w600),
                               ),
                               Text(
-                                'Siapa yang memesan ini?',
+                                selectedParticipants.isEmpty
+                                    ? 'Siapa yang memesan ini?'
+                                    : '${selectedParticipants.length} peserta dipilih',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.grey,
@@ -331,6 +415,91 @@ class _ItemsScreenState extends State<ItemsScreen> {
                       Icon(Icons.chevron_right, color: Colors.green),
                     ],
                   ),
+                ),
+              ),
+              SizedBox(height: 16),
+
+              // Tax/Service
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey[300]!),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.receipt_long, color: Colors.green),
+                            SizedBox(width: 12),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Pajak / Service',
+                                  style: TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                                Text(
+                                  'Masukkan persentase pajak',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        Switch(
+                          value: isTaxEnabled,
+                          onChanged: (value) {
+                            setState(() {
+                              isTaxEnabled = value;
+                            });
+                          },
+                          activeColor: Colors.green,
+                        ),
+                      ],
+                    ),
+                    if (isTaxEnabled) ...[
+                      SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: taxController,
+                              keyboardType: TextInputType.number,
+                              onChanged: _validateAndUpdateTax,
+                              decoration: InputDecoration(
+                                hintText: 'Contoh: 11',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 10,
+                                ),
+                                suffixText: '%',
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            '${customTaxPercent.toStringAsFixed(1)}%',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: Colors.green,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
                 ),
               ),
               SizedBox(height: 24),
@@ -351,19 +520,41 @@ class _ItemsScreenState extends State<ItemsScreen> {
                       return;
                     }
 
+                    if (selectedParticipants.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Pilih setidaknya 1 pemesan'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                      return;
+                    }
+
                     final newItem = MenuItem(
                       name: nameController.text,
                       price: int.parse(priceController.text),
-                      quantity: 1,
-                      includeTax: false,
+                      quantity: currentQuantity,
+                      includeTax: isTaxEnabled,
+                      taxPercent: isTaxEnabled ? customTaxPercent : 0.0,
+                      orderedBy: List<String>.from(selectedParticipants),
                     );
 
                     setState(() {
                       items.add(newItem);
                       nameController.clear();
                       priceController.clear();
+                      selectedParticipants.clear();
+                      currentQuantity = 1;
                       _updateTotal();
                     });
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Menu "${newItem.name}" ditambahkan'),
+                        backgroundColor: Colors.green,
+                        duration: Duration(milliseconds: 1500),
+                      ),
+                    );
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
@@ -401,21 +592,105 @@ class _ItemsScreenState extends State<ItemsScreen> {
                     final item = items[index];
                     return Padding(
                       padding: EdgeInsets.only(bottom: 12),
-                      child: ListTile(
-                        title: Text(
-                          '${item.name} (x${item.quantity})',
+                      child: Container(
+                        padding: EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey[300]!),
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        subtitle: Text(
-                          'Rp ${(item.price * item.quantity).toString()}',
-                        ),
-                        trailing: IconButton(
-                          icon: Icon(Icons.delete, color: Colors.red),
-                          onPressed: () {
-                            setState(() {
-                              items.removeAt(index);
-                              _updateTotal();
-                            });
-                          },
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '${item.name} (x${item.quantity})',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      SizedBox(height: 4),
+                                      Text(
+                                        'Rp ${(item.price * item.quantity).toString()}',
+                                        style: TextStyle(
+                                          color: Colors.green,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: Icon(Icons.delete, color: Colors.red),
+                                  onPressed: () {
+                                    setState(() {
+                                      items.removeAt(index);
+                                      _updateTotal();
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 8),
+                            // Display participants
+                            if (item.orderedBy.isNotEmpty)
+                              Container(
+                                width: double.infinity,
+                                padding: EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.green[50],
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Dipesan oleh:',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    SizedBox(height: 4),
+                                    Wrap(
+                                      spacing: 6,
+                                      children: item.orderedBy
+                                          .map(
+                                            (participant) => Chip(
+                                              label: Text(
+                                                participant,
+                                                style: TextStyle(fontSize: 12),
+                                              ),
+                                              backgroundColor:
+                                                  Colors.green[200],
+                                              padding: EdgeInsets.symmetric(
+                                                horizontal: 8,
+                                                vertical: 4,
+                                              ),
+                                            ),
+                                          )
+                                          .toList(),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            else
+                              Text(
+                                'Tidak ada pemesan',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.red,
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                     );
@@ -481,6 +756,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
   void dispose() {
     nameController.dispose();
     priceController.dispose();
+    taxController.dispose();
     super.dispose();
   }
 }

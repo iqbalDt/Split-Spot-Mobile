@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import '../models/event_model.dart';
 import '../models/participant_model.dart';
+import '../models/bill_calculator.dart';
 import 'payment_status_screen.dart';
 
-class ResultScreen extends StatelessWidget {
+class ResultScreen extends StatefulWidget {
   final String? eventName;
   final String? location;
   final DateTime? date;
@@ -11,7 +12,8 @@ class ResultScreen extends StatelessWidget {
   final List<Participant>? participants;
   final List<MenuItem>? items;
 
-  ResultScreen({
+  const ResultScreen({
+    super.key,
     this.eventName,
     this.location,
     this.date,
@@ -21,17 +23,52 @@ class ResultScreen extends StatelessWidget {
   });
 
   @override
+  State<ResultScreen> createState() => _ResultScreenState();
+}
+
+class _ResultScreenState extends State<ResultScreen> {
+  @override
   Widget build(BuildContext context) {
-    double totalAmount = 0;
-    if (items != null) {
-      for (var item in items!) {
-        totalAmount += item.priceWithTax;
+    // Calculate subtotal (without tax)
+    double subtotal = 0;
+    if (widget.items != null) {
+      for (var item in widget.items!) {
+        subtotal += item.totalPrice;
       }
     }
 
-    double splitAmount = participants != null && participants!.isNotEmpty
-        ? totalAmount / participants!.length
-        : 0;
+    // Determine if tax should be applied and get tax percentage
+    double taxPercent = 0.0;
+    if (widget.items != null && widget.items!.isNotEmpty) {
+      // Check if any item has tax enabled
+      for (var item in widget.items!) {
+        if (item.includeTax) {
+          taxPercent = item.taxPercent;
+          break; // All items should have same tax percentage
+        }
+      }
+    }
+
+    // Calculate total amount with tax
+    double totalAmount = subtotal;
+    if (taxPercent > 0) {
+      totalAmount = BillCalculator.calculateTotalWithTax(subtotal, taxPercent);
+    }
+
+    // Calculate bill per participant with tax applied at total level
+    Map<String, double>? participantBills;
+    String? validationError;
+    
+    if (widget.items != null && widget.items!.isNotEmpty) {
+      participantBills = BillCalculator.calculateBillWithTotalTax(
+        widget.items!,
+        taxPercent,
+      );
+      if (participantBills == null) {
+        final validation = BillCalculator.validateItems(widget.items!);
+        validationError = validation.errors.join('\n');
+      }
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -81,7 +118,7 @@ class ResultScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        eventName ?? 'Event',
+                        widget.eventName ?? 'Event',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -93,7 +130,7 @@ class ResultScreen extends StatelessWidget {
                           Icon(Icons.location_on,
                               size: 16, color: Colors.grey),
                           SizedBox(width: 8),
-                          Text(location ?? 'Lokasi tidak diketahui',
+                          Text(widget.location ?? 'Lokasi tidak diketahui',
                               style: TextStyle(color: Colors.grey)),
                         ],
                       ),
@@ -104,8 +141,8 @@ class ResultScreen extends StatelessWidget {
                               size: 16, color: Colors.grey),
                           SizedBox(width: 8),
                           Text(
-                            date != null
-                                ? '${date!.day}/${date!.month}/${date!.year}'
+                            widget.date != null
+                                ? '${widget.date!.day}/${widget.date!.month}/${widget.date!.year}'
                                 : 'Tanggal tidak diketahui',
                             style: TextStyle(color: Colors.grey),
                           ),
@@ -118,7 +155,7 @@ class ResultScreen extends StatelessWidget {
               SizedBox(height: 24),
 
               // Items section
-              if (items != null && items!.isNotEmpty) ...[
+              if (widget.items != null && widget.items!.isNotEmpty) ...[
                 Text(
                   'Item-item',
                   style: TextStyle(
@@ -127,7 +164,7 @@ class ResultScreen extends StatelessWidget {
                   ),
                 ),
                 SizedBox(height: 12),
-                ...items!.map((item) => Padding(
+                ...widget.items!.map((item) => Padding(
                       padding: EdgeInsets.only(bottom: 8),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -140,7 +177,7 @@ class ResultScreen extends StatelessWidget {
                                 style: TextStyle(fontWeight: FontWeight.w600),
                               ),
                               Text(
-                                'x${item.quantity}${item.includeTax ? ' (+11% tax)' : ''}',
+                                'x${item.quantity}${item.includeTax ? ' (tax applied)' : ''}',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.grey,
@@ -149,7 +186,7 @@ class ResultScreen extends StatelessWidget {
                             ],
                           ),
                           Text(
-                            'Rp ${item.priceWithTax}',
+                            'Rp ${item.totalPrice}',
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               color: Colors.green,
@@ -161,83 +198,173 @@ class ResultScreen extends StatelessWidget {
                 Divider(height: 20),
               ],
 
-              // Total
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Total',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+              // Total breakdown with tax details
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Subtotal row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Subtotal',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                        Text(
+                          'Rp ${subtotal.toStringAsFixed(0)}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  Text(
-                    'Rp ${totalAmount.toStringAsFixed(0)}',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.green,
+                    // Tax row (if applicable)
+                    if (taxPercent > 0) ...[
+                      SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Pajak (${taxPercent.toStringAsFixed(1)}%)',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.orange[700],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Text(
+                            'Rp ${(totalAmount - subtotal).toStringAsFixed(0)}',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.orange[700],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    // Divider
+                    SizedBox(height: 12),
+                    Container(
+                      height: 1,
+                      color: Colors.grey[300],
                     ),
-                  ),
-                ],
+                    // Grand total row
+                    SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Total',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                          ),
+                        ),
+                        Text(
+                          'Rp ${totalAmount.toStringAsFixed(0)}',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
               SizedBox(height: 24),
 
               // Participants and split
               Text(
-                'Peserta (${participants?.length ?? 0})',
+                'Peserta (${widget.participants?.length ?? 0})',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
               ),
               SizedBox(height: 12),
-              if (participants != null)
-                ...participants!.map((participant) => Padding(
-                      padding: EdgeInsets.only(bottom: 12),
-                      child: Container(
-                        padding: EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey[300]!),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
+              if (validationError != null)
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red[50],
+                    border: Border.all(color: Colors.red),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'Validation Error:\n$validationError',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontSize: 12,
+                    ),
+                  ),
+                )
+              else if (widget.participants != null)
+                ...widget.participants!.map((participant) {
+                  final participantAmount =
+                      participantBills?[participant.name] ?? 0.0;
+                  return Padding(
+                    padding: EdgeInsets.only(bottom: 12),
+                    child: Container(
+                      padding: EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey[300]!),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                participant.name,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              if (participant.phoneNumber.isNotEmpty)
                                 Text(
-                                  participant.name,
+                                  participant.phoneNumber,
                                   style: TextStyle(
-                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12,
+                                    color: Colors.grey,
                                   ),
                                 ),
-                                if (participant.phoneNumber.isNotEmpty)
-                                  Text(
-                                    participant.phoneNumber,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                              ],
+                            ],
+                          ),
+                          Text(
+                            'Rp ${participantAmount.toStringAsFixed(0)}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: Colors.green,
                             ),
-                            Text(
-                              'Rp ${splitAmount.toStringAsFixed(0)}',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                color: Colors.green,
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    )),
+                    ),
+                  );
+                }).toList(),
               SizedBox(height: 32),
 
-              // Split per orang
+              // Split per orang (average)
               Container(
                 width: double.infinity,
                 padding: EdgeInsets.all(16),
@@ -250,7 +377,7 @@ class ResultScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Bayar per orang',
+                      'Rata-rata per orang',
                       style: TextStyle(
                         color: Colors.grey,
                         fontSize: 12,
@@ -258,7 +385,9 @@ class ResultScreen extends StatelessWidget {
                     ),
                     SizedBox(height: 4),
                     Text(
-                      'Rp ${splitAmount.toStringAsFixed(0)}',
+                      participantBills != null && participantBills!.isNotEmpty
+                          ? 'Rp ${(BillCalculator.getTotalFromBills(participantBills!) / widget.participants!.length).toStringAsFixed(0)}'
+                          : 'Rp 0',
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -278,12 +407,12 @@ class ResultScreen extends StatelessWidget {
                     // Create event
                     final newEvent = Event(
                       id: DateTime.now().toString(),
-                      name: eventName ?? 'Event',
-                      location: location ?? 'Lokasi',
-                      date: date ?? DateTime.now(),
+                      name: widget.eventName ?? 'Event',
+                      location: widget.location ?? 'Lokasi',
+                      date: widget.date ?? DateTime.now(),
                       status: 'Active',
                       paidCount: 0,
-                      totalParticipants: participants?.length ?? 0,
+                      totalParticipants: widget.participants?.length ?? 0,
                       imageUrl: 'assets/event.jpg',
                       totalAmount: totalAmount,
                       paymentStatus: 'Unpaid',
@@ -298,14 +427,16 @@ class ResultScreen extends StatelessWidget {
                       MaterialPageRoute(
                         builder: (context) => PaymentStatusScreen(
                           event: newEvent,
-                          paidBy: participants?.isNotEmpty == true
-                              ? participants!.first.name
+                          paidBy: widget.participants?.isNotEmpty == true
+                              ? widget.participants!.first.name
                               : 'Pembayar',
                           refNumber: refNumber,
                         ),
                       ),
                     ).then((value) {
                       // After payment, return to home with event data
+                      // Check if widget is still mounted before using context
+                      if (!mounted) return;
                       if (value == null) {
                         Navigator.of(context).popUntil((route) => route.isFirst);
                         Navigator.pop(context, newEvent);
