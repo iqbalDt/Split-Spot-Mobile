@@ -18,7 +18,31 @@ class ValidationResult {
       : 'Invalid: ${errors.join(", ")}';
 }
 
-/// Utility class for bill calculations with item-based splitting
+/// Utility class for bill calculations with item-based splitting and GLOBAL tax
+/// 
+/// CALCULATION FLOW (GLOBAL TAX MODEL):
+/// 
+/// Step 1: Calculate base bill (without tax)
+///   - For each item: splitAmount = (item.price × item.quantity) ÷ number of participants
+///   - Sum for each participant across all items they ordered
+///   - Result: participantSubtotal (BEFORE TAX)
+/// 
+/// Step 2: Calculate tax amount ONCE at total level
+///   - subtotal = sum of all items (no tax)
+///   - taxAmount = subtotal × (taxPercent ÷ 100)
+///   - Tax is calculated once, not per item
+/// 
+/// Step 3: Distribute tax proportionally
+///   - For each participant: 
+///     participantTax = (participantSubtotal ÷ subtotal) × taxAmount
+///   - This ensures fair distribution based on each person's share
+///   - Final amount = participantSubtotal + participantTax
+/// 
+/// KEY PRINCIPLES:
+/// - NO item-level tax (removed from MenuItem model)
+/// - Tax applied only once to entire bill
+/// - Participants with higher bills pay more tax
+/// - Clean separation: items handle pricing, tax handled globally
 class BillCalculator {
   /// Calculate bill split per participant WITHOUT tax
   /// 
@@ -139,9 +163,16 @@ class BillCalculator {
     return calculateBillPerParticipant(items);
   }
 
-  /// Calculate subtotal from all items (price * quantity, without tax)
+  /// Calculate subtotal from all items (price × quantity, WITHOUT tax)
   /// 
-  /// Returns the sum of (item.price * item.quantity) for all items
+  /// This is step 2 in the global tax calculation:
+  /// - Sums all item prices (no tax included)
+  /// - Used as the base for one-time tax calculation
+  /// - Does NOT multiply by any tax percentage
+  /// 
+  /// Formula: subtotal = Σ(item.price × item.quantity) for all items
+  /// 
+  /// Returns the sum of (item.price × item.quantity) for all items
   static double calculateSubtotal(List<MenuItem> items) {
     double subtotal = 0;
     for (var item in items) {
@@ -150,13 +181,24 @@ class BillCalculator {
     return subtotal;
   }
 
-  /// Calculate total amount with tax applied
+  /// Calculate total amount with GLOBAL tax applied once
+  /// 
+  /// This calculates the total tax amount to distribute.
+  /// Tax is applied ONCE to the entire bill, not per item.
+  /// 
+  /// Formula: totalWithTax = subtotal + (subtotal × taxPercent / 100)
+  /// 
+  /// EXAMPLE:
+  ///   subtotal = 100,000 IDR
+  ///   taxPercent = 11
+  ///   taxAmount = 100,000 × (11 / 100) = 11,000 IDR
+  ///   totalWithTax = 100,000 + 11,000 = 111,000 IDR
   /// 
   /// Parameters:
-  /// - subtotal: base amount before tax
-  /// - taxPercent: tax percentage (e.g., 11 for 11%)
+  /// - subtotal: Base amount before tax (sum of all items, no tax)
+  /// - taxPercent: Tax percentage (e.g., 11 for 11%, 0 for no tax)
   /// 
-  /// Returns: subtotal + (subtotal * taxPercent / 100)
+  /// Returns: SubTotal + (subtotal × taxPercent / 100), or subtotal if taxPercent ≤ 0
   static double calculateTotalWithTax(
     double subtotal,
     double taxPercent,
@@ -168,17 +210,29 @@ class BillCalculator {
     return subtotal + taxAmount;
   }
 
-  /// Distribute tax proportionally to participant bills
+  /// Distribute global tax proportionally to participant bills
   /// 
-  /// Takes the participant split amounts and applies tax proportionally
-  /// based on each participant's share of the subtotal.
+  /// PROPORTIONAL TAX DISTRIBUTION FORMULA:
+  ///   participantTax = (participantBill / subtotal) × totalTaxAmount
+  /// 
+  /// This ensures participants pay tax in proportion to their share of the bill.
+  /// 
+  /// EXAMPLE:
+  ///   subtotal = 100k, tax 10% (taxAmount = 10k), taxPercent = 10
+  ///   - Participant A's bill: 40k (40% of bill) → tax share = 4k → final = 44k
+  ///   - Participant B's bill: 30k (30% of bill) → tax share = 3k → final = 33k
+  ///   - Participant C's bill: 30k (30% of bill) → tax share = 3k → final = 33k
+  ///   Total: 100k + 10k = 110k ✓
   /// 
   /// Parameters:
-  /// - bills: Map of participant -> amount (from calculateBillPerParticipant)
-  /// - subtotal: total before tax
-  /// - taxPercent: tax percentage (e.g., 11 for 11%)
+  /// - bills: Map of participant → subtotal (BEFORE tax)
+  /// - subtotal: Total of all items (no tax)
+  /// - taxPercent: Tax percentage (e.g., 11 for 11%)
   /// 
   /// Returns: Updated map with tax distributed proportionally
+  /// 
+  /// IMPORTANT: This is only called by calculateBillWithTotalTax()
+  /// Do NOT call this directly - use calculateBillWithTotalTax() instead
   static Map<String, double> applyTaxToParticipantBills(
     Map<String, double> bills,
     double subtotal,
@@ -193,15 +247,16 @@ class BillCalculator {
       return bills;
     }
 
-    // Calculate total tax to apply
+    // Calculate total tax amount to distribute (one-time calculation)
     final totalWithTax = calculateTotalWithTax(subtotal, taxPercent);
     final taxAmount = totalWithTax - subtotal;
 
     // Distribute tax proportionally based on each participant's share
+    // participantTax = (participantAmount / subtotal) × taxAmount
     final updatedBills = <String, double>{};
     for (final entry in bills.entries) {
       final participantAmount = entry.value;
-      // Calculate this participant's share of tax
+      // Calculate this participant's proportional share of tax
       final participantTaxShare =
           (participantAmount / subtotal) * taxAmount;
       updatedBills[entry.key] = participantAmount + participantTaxShare;
@@ -210,24 +265,43 @@ class BillCalculator {
     return updatedBills;
   }
 
-  /// Calculate complete bill with item-based splitting and total-level tax
+  /// Calculate complete bill with item-based splitting and GLOBAL total-level tax
   /// 
-  /// This method:
-  /// 1. Validates items
-  /// 2. Calculates per-participant split (based on base prices, no tax)
-  /// 3. Calculates total tax on the subtotal
-  /// 4. Distributes tax proportionally to each participant
+  /// GLOBAL TAX CALCULATION (replaces per-item tax):
+  /// 
+  /// Step 1: Validate items
+  ///   - Ensures all items have at least 1 participant (no division by zero)
+  /// 
+  /// Step 2: Calculate base split WITHOUT tax
+  ///   - Each item's cost is divided only among participants who ordered it
+  ///   - Participants are summed across all items
+  ///   - Example: Alice ordered Pizza (20k, shared with Bob), Drink (10k alone)
+  ///     → Alice's base = 10k (pizza share) + 10k (drink) = 20k
+  /// 
+  /// Step 3: Apply tax ONCE to entire bill
+  ///   - Tax amount = subtotal × (taxPercent / 100)
+  ///   - Example: subtotal = 100k, tax 10% → taxAmount = 10k
+  ///   - Tax is NOT recalculated per item or per participant
+  /// 
+  /// Step 4: Distribute tax proportionally
+  ///   - Each participant pays tax based on their share of the subtotal
+  ///   - participantTax = (participantBase / subtotal) × totalTax
+  ///   - Final = participantBase + participantTax
+  ///   - This ensures fair tax distribution
+  /// 
+  /// FLOW DIAGRAM:
+  ///   Items → Base Bills → Total Tax (once) → Distribute Tax → Final Bills
   /// 
   /// Parameters:
-  /// - items: List of items with participants and quantities
-  /// - taxPercent: Tax percentage to apply to the total (e.g., 11 for 11%)
+  /// - items: List of menu items with participants (NO item-level tax fields)
+  /// - taxPercent: Global tax percentage applied at end (0 = no tax, 11 = 11%)
   /// 
-  /// Returns: Map of participant -> final amount (with tax), or null if validation fails
+  /// Returns: 
+  /// - Map of participant name → final amount (with tax included)
+  /// - null if validation fails (e.g., items without participants)
   /// 
-  /// Tax Distribution:
-  /// - Total tax = subtotal × (taxPercent / 100)
-  /// - Per participant tax = (participantSubtotal / subtotal) × totalTax
-  /// - Final = participantSubtotal + participantTax
+  /// IMPORTANT: Tax is applied ONCE globally, not per item.
+  /// This method is the single entry point for tax calculations.
   static Map<String, double>? calculateBillWithTotalTax(
     List<MenuItem> items,
     double taxPercent,
@@ -244,7 +318,7 @@ class BillCalculator {
       return null;
     }
 
-    // Apply tax if needed
+    // Apply tax if needed (global, one-time calculation)
     if (taxPercent > 0) {
       final subtotal = calculateSubtotal(items);
       if (subtotal > 0) {
@@ -255,29 +329,4 @@ class BillCalculator {
     return baseBills;
   }
 
-  /// Legacy method - replaced by calculateBillWithTotalTax()
-  /// Kept for backward compatibility
-  @Deprecated('Use calculateBillWithTotalTax() instead')
-  static Map<String, double>? calculateBillPerParticipantWithTaxSafe(
-    List<MenuItem> items,
-  ) {
-    // Validate items
-    final validation = validateItems(items);
-    if (!validation.isValid) {
-      return null;
-    }
-
-    // Calculate bill split (without tax)
-    return calculateBillPerParticipant(items);
-  }
-
-  /// Verify that all items have tax enabled with proper tax percentages
-  /// 
-  /// Useful for debugging to ensure tax is being applied
-  /// 
-  /// Returns: List of items that don't have tax properly configured
-  static List<MenuItem> getItemsWithoutProperTax(List<MenuItem> items) {
-    return items
-        .where((item) => item.includeTax && item.taxPercent <= 0)
-        .toList();
-  }}
+}

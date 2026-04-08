@@ -189,7 +189,7 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
                 ),
               ),
             ),
-            SizedBox(height: 12),
+            SizedBox(height: 24),
             // Tombol Lanjut
             SizedBox(
               width: double.infinity,
@@ -212,6 +212,7 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
                           date: widget.date,
                           googleMapsLink: widget.googleMapsLink,
                           participants: participants,
+
                         ),
                       ),
                     ).then((value) {
@@ -249,6 +250,11 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
   }
 
   void _showAddParticipantDialog(

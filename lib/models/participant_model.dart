@@ -12,33 +12,16 @@ class MenuItem {
   final String name;
   final int price;
   int quantity;
-  bool includeTax;
-  double taxPercent;
   List<String> orderedBy;
 
   MenuItem({
     required this.name,
     required this.price,
     this.quantity = 1,
-    this.includeTax = false,
-    this.taxPercent = 0.0,
     this.orderedBy = const [],
   });
 
   int get totalPrice => price * quantity;
-  
-  /// Get price with tax (for display purposes only)
-  /// 
-  /// NOTE: For bill calculations, tax is applied at the TOTAL level using BillCalculator,
-  /// not at the item level. This getter is only for UI display.
-  int get priceWithTax {
-    if (includeTax && taxPercent > 0) {
-      // Dynamic tax calculation: total * (1 + taxPercent/100)
-      final taxMultiplier = 1 + (taxPercent / 100);
-      return (totalPrice * taxMultiplier).toInt();
-    }
-    return totalPrice;
-  }
 
   /// Calculate the split price per person (BASE price, WITHOUT tax)
   /// 

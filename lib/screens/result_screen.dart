@@ -11,6 +11,8 @@ class ResultScreen extends StatefulWidget {
   final String? googleMapsLink;
   final List<Participant>? participants;
   final List<MenuItem>? items;
+  final bool isTaxEnabled;
+  final double taxPercent;
 
   const ResultScreen({
     super.key,
@@ -20,6 +22,8 @@ class ResultScreen extends StatefulWidget {
     this.googleMapsLink,
     this.participants,
     this.items,
+    this.isTaxEnabled = false,
+    this.taxPercent = 0.0,
   });
 
   @override
@@ -29,7 +33,10 @@ class ResultScreen extends StatefulWidget {
 class _ResultScreenState extends State<ResultScreen> {
   @override
   Widget build(BuildContext context) {
-    // Calculate subtotal (without tax)
+    // ===== GLOBAL TAX CALCULATION FLOW =====
+    // This section calculates the bill using global tax (not item-level)
+    
+    // STEP 1: Calculate subtotal (sum of all items, NO tax)
     double subtotal = 0;
     if (widget.items != null) {
       for (var item in widget.items!) {
@@ -37,25 +44,23 @@ class _ResultScreenState extends State<ResultScreen> {
       }
     }
 
-    // Determine if tax should be applied and get tax percentage
-    double taxPercent = 0.0;
-    if (widget.items != null && widget.items!.isNotEmpty) {
-      // Check if any item has tax enabled
-      for (var item in widget.items!) {
-        if (item.includeTax) {
-          taxPercent = item.taxPercent;
-          break; // All items should have same tax percentage
-        }
-      }
-    }
+    // STEP 2: Get global tax settings from event level (not from items)
+    // isTaxEnabled and taxPercent are set once at event creation
+    double taxPercent = widget.isTaxEnabled ? widget.taxPercent : 0.0;
 
-    // Calculate total amount with tax
+    // STEP 3: Calculate total amount with global tax applied ONCE
+    // Formula: totalAmount = subtotal + (subtotal × taxPercent / 100)
+    // Tax is NOT recalculated per item
     double totalAmount = subtotal;
     if (taxPercent > 0) {
       totalAmount = BillCalculator.calculateTotalWithTax(subtotal, taxPercent);
     }
 
-    // Calculate bill per participant with tax applied at total level
+    // STEP 4: Calculate participant bills with proportional tax distribution
+    // Uses BillCalculator.calculateBillWithTotalTax() which:
+    //   a) Calculates base split (items ÷ participants)
+    //   b) Calculates total tax (subtotal × taxPercent / 100)
+    //   c) Distributes tax proportionally to each participant
     Map<String, double>? participantBills;
     String? validationError;
     
@@ -69,6 +74,7 @@ class _ResultScreenState extends State<ResultScreen> {
         validationError = validation.errors.join('\n');
       }
     }
+    // ===== END CALCULATION FLOW =====
 
     return Scaffold(
       appBar: AppBar(
@@ -177,7 +183,7 @@ class _ResultScreenState extends State<ResultScreen> {
                                 style: TextStyle(fontWeight: FontWeight.w600),
                               ),
                               Text(
-                                'x${item.quantity}${item.includeTax ? ' (tax applied)' : ''}',
+                                'x${item.quantity}',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.grey,
@@ -385,8 +391,8 @@ class _ResultScreenState extends State<ResultScreen> {
                     ),
                     SizedBox(height: 4),
                     Text(
-                      participantBills != null && participantBills!.isNotEmpty
-                          ? 'Rp ${(BillCalculator.getTotalFromBills(participantBills!) / widget.participants!.length).toStringAsFixed(0)}'
+                      participantBills != null && participantBills.isNotEmpty
+                          ? 'Rp ${(BillCalculator.getTotalFromBills(participantBills) / widget.participants!.length).toStringAsFixed(0)}'
                           : 'Rp 0',
                       style: TextStyle(
                         fontSize: 24,

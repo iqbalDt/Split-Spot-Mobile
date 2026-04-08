@@ -8,6 +8,8 @@ class ItemsScreen extends StatefulWidget {
   final DateTime? date;
   final String? googleMapsLink;
   final List<Participant>? participants;
+  final bool isTaxEnabled;
+  final double taxPercent;
 
   const ItemsScreen({
     super.key,
@@ -16,6 +18,8 @@ class ItemsScreen extends StatefulWidget {
     this.date,
     this.googleMapsLink,
     this.participants,
+    this.isTaxEnabled = false,
+    this.taxPercent = 0.0,
   });
 
   @override
@@ -26,11 +30,13 @@ class _ItemsScreenState extends State<ItemsScreen> {
   final List<MenuItem> items = [];
   final TextEditingController nameController = TextEditingController();
   final TextEditingController priceController = TextEditingController();
-  final TextEditingController taxController = TextEditingController(text: '11');
+  late final TextEditingController taxController = TextEditingController(
+    text: widget.taxPercent > 0 ? widget.taxPercent.toString() : '',
+  );
   List<String> selectedParticipants = [];
   int currentQuantity = 1;
-  bool isTaxEnabled = false;
-  double customTaxPercent = 11.0;
+  late bool isTaxEnabled = widget.isTaxEnabled;
+  late double customTaxPercent = widget.taxPercent;
 
   int totalMenuPrice = 0;
 
@@ -163,11 +169,8 @@ class _ItemsScreenState extends State<ItemsScreen> {
                     items.clear();
                     nameController.clear();
                     priceController.clear();
-                    taxController.text = '11';
                     selectedParticipants.clear();
                     currentQuantity = 1;
-                    isTaxEnabled = false;
-                    customTaxPercent = 11.0;
                     _updateTotal();
                   });
                 },
@@ -373,58 +376,17 @@ class _ItemsScreenState extends State<ItemsScreen> {
                   ),
                 ],
               ),
-              SizedBox(height: 16),
+              SizedBox(height: 24),
 
-              // Pilih Pemesan
-              GestureDetector(
-                onTap: _showParticipantSelector,
-                child: Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    border:
-                        Border.all(color: Colors.green[300]!, width: 1.5),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.people_alt_outlined, color: Colors.green),
-                          SizedBox(width: 12),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Pilih Pemesan',
-                                style: TextStyle(fontWeight: FontWeight.w600),
-                              ),
-                              Text(
-                                selectedParticipants.isEmpty
-                                    ? 'Siapa yang memesan ini?'
-                                    : '${selectedParticipants.length} peserta dipilih',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      Icon(Icons.chevron_right, color: Colors.green),
-                    ],
-                  ),
-                ),
-              ),
-              SizedBox(height: 16),
-
-              // Tax/Service
+              // Tax/Service Configuration
               Container(
                 padding: EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey[300]!),
+                  border: Border.all(
+                    color: isTaxEnabled ? Colors.green[300]! : Colors.grey[300]!,
+                  ),
                   borderRadius: BorderRadius.circular(12),
+                  color: isTaxEnabled ? Colors.green[50] : Colors.transparent,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -434,7 +396,10 @@ class _ItemsScreenState extends State<ItemsScreen> {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.receipt_long, color: Colors.green),
+                            Icon(
+                              Icons.receipt_long,
+                              color: isTaxEnabled ? Colors.green : Colors.grey,
+                            ),
                             SizedBox(width: 12),
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -504,6 +469,50 @@ class _ItemsScreenState extends State<ItemsScreen> {
               ),
               SizedBox(height: 24),
 
+              // Pilih Pemesan
+              GestureDetector(
+                onTap: _showParticipantSelector,
+                child: Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    border:
+                        Border.all(color: Colors.green[300]!, width: 1.5),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.people_alt_outlined, color: Colors.green),
+                          SizedBox(width: 12),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Pilih Pemesan',
+                                style: TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                              Text(
+                                selectedParticipants.isEmpty
+                                    ? 'Siapa yang memesan ini?'
+                                    : '${selectedParticipants.length} peserta dipilih',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      Icon(Icons.chevron_right, color: Colors.green),
+                    ],
+                  ),
+                ),
+              ),
+              SizedBox(height: 16),
+
               // Tombol Simpan Menu
               SizedBox(
                 width: double.infinity,
@@ -534,8 +543,6 @@ class _ItemsScreenState extends State<ItemsScreen> {
                       name: nameController.text,
                       price: int.parse(priceController.text),
                       quantity: currentQuantity,
-                      includeTax: isTaxEnabled,
-                      taxPercent: isTaxEnabled ? customTaxPercent : 0.0,
                       orderedBy: List<String>.from(selectedParticipants),
                     );
 
@@ -712,6 +719,8 @@ class _ItemsScreenState extends State<ItemsScreen> {
                             googleMapsLink: widget.googleMapsLink,
                             participants: widget.participants,
                             items: items,
+                            isTaxEnabled: isTaxEnabled,
+                            taxPercent: customTaxPercent,
                           ),
                         ),
                       ).then((value) {

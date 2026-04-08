@@ -9,6 +9,8 @@ class Event {
   final String imageUrl;
   final double totalAmount;
   final String paymentStatus; // Paid, Unpaid, Belum Bayar
+  bool isTaxEnabled;
+  double taxPercent;
 
   Event({
     required this.id,
@@ -21,5 +23,7 @@ class Event {
     required this.imageUrl,
     required this.totalAmount,
     required this.paymentStatus,
+    this.isTaxEnabled = false,
+    this.taxPercent = 0.0,
   });
 }
