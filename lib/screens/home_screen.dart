@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'create_event_screen.dart';
 import '../models/event_model.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -71,25 +70,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 return _buildEventCard(context, events[index]);
               },
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => CreateEventScreen(),
-            ),
-          ).then((value) {
-            // Refresh data jika ada event baru
-            if (value != null) {
-              setState(() {
-                events.add(value);
-              });
-            }
-          });
-        },
-        backgroundColor: Colors.green,
-        child: Icon(Icons.add),
-      ),
     );
   }
 
