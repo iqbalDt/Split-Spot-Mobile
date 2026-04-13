@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "991604351159",
+    "project_id": "split-spot-4934d",
+    "storage_bucket": "split-spot-4934d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:991604351159:android:d901443ce975ab6b52ad32",
+        "android_client_info": {
+          "package_name": "com.example.splitspot"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDmCEZWFs2H1_LgCt9Zfn6Tto4334b0eVI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

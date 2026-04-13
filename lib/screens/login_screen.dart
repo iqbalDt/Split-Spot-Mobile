@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'register_screen.dart';
 import 'dashboard_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -15,7 +16,6 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _emailError;
   String? _passwordError;
 
-  // Email validation regex
   bool _isValidEmail(String email) {
     final emailRegex = RegExp(
       r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
@@ -23,7 +23,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return emailRegex.hasMatch(email);
   }
 
-  void _validateAndLogin() {
+  Future<void> _validateAndLogin() async {
     setState(() {
       _emailError = null;
       _passwordError = null;
@@ -31,46 +31,73 @@ class _LoginScreenState extends State<LoginScreen> {
 
     bool isValid = true;
 
-    // Email validation
     if (emailController.text.isEmpty) {
-      setState(() {
-        _emailError = 'Email tidak boleh kosong';
-      });
+      _emailError = 'Email tidak boleh kosong';
       isValid = false;
     } else if (!_isValidEmail(emailController.text)) {
-      setState(() {
-        _emailError = 'Format email tidak valid';
-      });
+      _emailError = 'Format email tidak valid';
       isValid = false;
     }
 
-    // Password validation
     if (passwordController.text.isEmpty) {
-      setState(() {
-        _passwordError = 'Password tidak boleh kosong';
-      });
+      _passwordError = 'Password tidak boleh kosong';
       isValid = false;
     }
 
-    if (isValid) {
-      // Show loading state
-      setState(() {
-        _isLoading = true;
-      });
-
-      // Simulate login delay
-      Future.delayed(Duration(seconds: 1), () {
-        setState(() {
-          _isLoading = false;
-        });
-
-        // Navigate to dashboard
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => DashboardScreen()),
-        );
-      });
+    if (!isValid) {
+      setState(() {});
+      return;
     }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: emailController.text.trim(),
+        password: passwordController.text.trim(),
+      );
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => DashboardScreen()),
+      );
+    } on FirebaseAuthException catch (e) {
+      String message;
+
+      switch (e.code) {
+        case 'user-not-found':
+          message = 'User tidak ditemukan';
+          break;
+        case 'wrong-password':
+          message = 'Password salah';
+          break;
+        case 'invalid-email':
+          message = 'Email tidak valid';
+          break;
+        default:
+          message = 'Login gagal';
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Terjadi error'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+
+    setState(() {
+      _isLoading = false;
+    });
   }
 
   @override
@@ -83,24 +110,24 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              SizedBox(height: 40),
-              // Logo
+              SizedBox(height: 20),
+
+              // App Icon
               Container(
-                width: 80,
-                height: 80,
+                width: 60,
+                height: 60,
                 decoration: BoxDecoration(
                   color: Colors.green,
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: Icon(
                   Icons.receipt_long,
                   color: Colors.white,
-                  size: 48,
+                  size: 32,
                 ),
               ),
               SizedBox(height: 24),
 
-              // Title
               Text(
                 'SplitSpot',
                 style: TextStyle(
@@ -111,18 +138,15 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               SizedBox(height: 8),
 
-              // Subtitle
               Text(
                 'Manage shared expenses effortlessly.',
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.grey[600],
                 ),
-                textAlign: TextAlign.center,
               ),
               SizedBox(height: 40),
 
-              // Welcome message
               Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
@@ -136,7 +160,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               SizedBox(height: 24),
 
-              // Email field
+              // EMAIL
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -153,7 +177,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     controller: emailController,
                     decoration: InputDecoration(
                       hintText: 'Enter your email address',
-                      prefixIcon: Icon(Icons.email_outlined, color: Colors.green),
+                      prefixIcon: Icon(
+                        Icons.email_outlined,
+                        color: Colors.grey[600],
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide(
@@ -191,7 +218,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               SizedBox(height: 16),
 
-              // Password field
+              // PASSWORD
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -209,7 +236,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     obscureText: _obscurePassword,
                     decoration: InputDecoration(
                       hintText: 'Enter your password',
-                      prefixIcon: Icon(Icons.lock_outline, color: Colors.green),
+                      prefixIcon: Icon(
+                        Icons.lock_outline,
+                        color: Colors.grey[600],
+                      ),
                       suffixIcon: GestureDetector(
                         onTap: () {
                           setState(() {
@@ -217,8 +247,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           });
                         },
                         child: Icon(
-                          _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                          color: Colors.green,
+                          _obscurePassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                          color: Colors.grey[600],
                         ),
                       ),
                       border: OutlineInputBorder(
@@ -254,31 +286,26 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               SizedBox(height: 12),
 
-              // Forgot Password link
+              // Forgot Password Link
               Align(
                 alignment: Alignment.centerRight,
                 child: GestureDetector(
                   onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Forgot password feature coming soon'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
+                    // Handle forgot password
                   },
                   child: Text(
                     'Forgot Password?',
                     style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.green,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
               ),
               SizedBox(height: 24),
 
-              // Login button
+              // LOGIN BUTTON
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -305,7 +332,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              'Log In',
+                              'Log in',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
@@ -313,85 +340,80 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                             SizedBox(width: 8),
-                            Icon(Icons.arrow_forward, color: Colors.white),
+                            Icon(Icons.arrow_forward, color: Colors.white, size: 20),
                           ],
                         ),
                 ),
               ),
+
               SizedBox(height: 24),
 
-              // Divider with text
+              // Social Login Buttons
               Row(
                 children: [
                   Expanded(
-                    child: Divider(color: Colors.grey[300], thickness: 1),
-                  ),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 12),
-                    child: Text(
-                      'Or continue with',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        // Handle Google login
+                      },
+                      icon: Icon(Icons.g_mobiledata, color: Colors.black, size: 24),
+                      label: Text(
+                        'Google',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        side: BorderSide(color: Colors.grey[300]!),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                     ),
                   ),
+                  SizedBox(width: 12),
                   Expanded(
-                    child: Divider(color: Colors.grey[300], thickness: 1),
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        // Handle Facebook login
+                      },
+                      icon: Icon(Icons.facebook, color: Colors.blue, size: 24),
+                      label: Text(
+                        'Facebook',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        side: BorderSide(color: Colors.grey[300]!),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
+
+              SizedBox(height: 16),
+
+              Text(
+                'Or continue with',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[500],
+                ),
+              ),
+
               SizedBox(height: 20),
 
-              // Social login buttons
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Google button
-                  GestureDetector(
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Google login coming soon'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                    },
-                    child: Container(
-                      padding: EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey[300]!, width: 1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(Icons.language, color: Colors.black, size: 24),
-                    ),
-                  ),
-                  SizedBox(width: 16),
-
-                  // Facebook button
-                  GestureDetector(
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Facebook login coming soon'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                    },
-                    child: Container(
-                      padding: EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey[300]!, width: 1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(Icons.language, color: Colors.black, size: 24),
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 32),
-
-              // Register link
+              // Register Link
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -406,7 +428,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => RegisterScreen()),
+                        MaterialPageRoute(
+                          builder: (context) => RegisterScreen(),
+                        ),
                       );
                     },
                     child: Text(
@@ -420,7 +444,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ],
               ),
-              SizedBox(height: 40),
             ],
           ),
         ),

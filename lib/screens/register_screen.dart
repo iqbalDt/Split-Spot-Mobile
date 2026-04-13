@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'login_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -29,7 +30,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return emailRegex.hasMatch(email);
   }
 
-  void _validateAndRegister() {
+  Future<void> _validateAndRegister() async {
     setState(() {
       _fullNameError = null;
       _emailError = null;
@@ -92,11 +93,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _isLoading = true;
       });
 
-      // Simulate registration delay
-      Future.delayed(Duration(seconds: 1), () {
-        setState(() {
-          _isLoading = false;
-        });
+      try {
+        await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: emailController.text.trim(),
+          password: passwordController.text.trim(),
+        );
 
         // Show success message and navigate to login
         ScaffoldMessenger.of(context).showSnackBar(
@@ -112,7 +113,41 @@ class _RegisterScreenState extends State<RegisterScreen> {
             MaterialPageRoute(builder: (context) => LoginScreen()),
           );
         });
-      });
+      } on FirebaseAuthException catch (e) {
+        String message;
+
+        switch (e.code) {
+          case 'email-already-in-use':
+            message = 'Email sudah terdaftar';
+            break;
+          case 'weak-password':
+            message = 'Password terlalu lemah';
+            break;
+          case 'invalid-email':
+            message = 'Email tidak valid';
+            break;
+          default:
+            message = 'Pendaftaran gagal';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: Colors.red,
+          ),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Terjadi error'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      } finally {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -136,6 +171,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // App Icon
+              Center(
+                child: Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: Colors.green,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(
+                    Icons.receipt_long,
+                    color: Colors.white,
+                    size: 32,
+                  ),
+                ),
+              ),
+              SizedBox(height: 24),
+
               // Title
               Text(
                 'Create Account',
