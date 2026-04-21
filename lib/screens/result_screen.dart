@@ -439,15 +439,7 @@ class _ResultScreenState extends State<ResultScreen> {
                           refNumber: refNumber,
                         ),
                       ),
-                    ).then((value) {
-                      // After payment, return to home with event data
-                      // Check if widget is still mounted before using context
-                      if (!mounted) return;
-                      if (value == null) {
-                        Navigator.of(context).popUntil((route) => route.isFirst);
-                        Navigator.pop(context, newEvent);
-                      }
-                    });
+                    );
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,

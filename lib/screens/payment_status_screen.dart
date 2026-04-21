@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/event_model.dart';
+import 'dashboard_screen.dart';
 
 class PaymentStatusScreen extends StatelessWidget {
   final Event event;
@@ -188,10 +189,11 @@ class PaymentStatusScreen extends StatelessWidget {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () {
-                    // Pop all routes and return to home
-                    while (Navigator.of(context).canPop()) {
-                      Navigator.of(context).pop();
-                    }
+                    // Navigate to DashboardScreen and remove all previous routes
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (context) => DashboardScreen()),
+                      (route) => false,
+                    );
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,

@@ -103,51 +103,64 @@ class _ItemsScreenState extends State<ItemsScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Pilih Pemesan'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: widget.participants!.map((participant) {
-              return CheckboxListTile(
-                title: Text(participant.name),
-                subtitle: Text(
-                  participant.phoneNumber,
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (builderContext, dialogSetState) {
+            return AlertDialog(
+              title: Text('Pilih Pemesan'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: widget.participants!.map((participant) {
+                    final isSelected =
+                        selectedParticipants.contains(participant.name);
+                    return CheckboxListTile(
+                      title: Text(participant.name),
+                      subtitle: Text(
+                        participant.phoneNumber,
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                      value: isSelected,
+                      activeColor: Colors.green,
+                      onChanged: (isChecked) {
+                        // Update both the dialog UI and the parent state
+                        dialogSetState(() {
+                          if (isChecked == true) {
+                            if (!selectedParticipants
+                                .contains(participant.name)) {
+                              selectedParticipants.add(participant.name);
+                            }
+                          } else {
+                            selectedParticipants.remove(participant.name);
+                          }
+                        });
+                        // Also update the parent widget state
+                        setState(() {});
+                      },
+                    );
+                  }).toList(),
                 ),
-                value: selectedParticipants.contains(participant.name),
-                onChanged: (isChecked) {
-                  setState(() {
-                    if (isChecked == true) {
-                      if (!selectedParticipants.contains(participant.name)) {
-                        selectedParticipants.add(participant.name);
-                      }
-                    } else {
-                      selectedParticipants.remove(participant.name);
-                    }
-                  });
-                },
-              );
-            }).toList(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Batal'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-            ),
-            child: Text(
-              'Selesai',
-              style: TextStyle(color: Colors.white),
-            ),
-          ),
-        ],
-      ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: Text('Batal'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                  ),
+                  child: Text(
+                    'Selesai',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
