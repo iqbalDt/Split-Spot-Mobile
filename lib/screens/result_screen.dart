@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/event_model.dart';
 import '../models/participant_model.dart';
 import '../models/bill_calculator.dart';
 import 'payment_status_screen.dart';
+import 'dashboard_screen.dart';
 
 class ResultScreen extends StatefulWidget {
   final String? eventName;
@@ -31,6 +34,8 @@ class ResultScreen extends StatefulWidget {
 }
 
 class _ResultScreenState extends State<ResultScreen> {
+  bool _isSaving = false;
+
   @override
   Widget build(BuildContext context) {
     // ===== GLOBAL TAX CALCULATION FLOW =====
@@ -409,37 +414,76 @@ class _ResultScreenState extends State<ResultScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
-                    // Create event
-                    final newEvent = Event(
-                      id: DateTime.now().toString(),
-                      name: widget.eventName ?? 'Event',
-                      location: widget.location ?? 'Lokasi',
-                      date: widget.date ?? DateTime.now(),
-                      status: 'Active',
-                      paidCount: 0,
-                      totalParticipants: widget.participants?.length ?? 0,
-                      imageUrl: 'assets/event.jpg',
-                      totalAmount: totalAmount,
-                      paymentStatus: 'Unpaid',
-                    );
+                  onPressed: _isSaving ? null : () async {
+                    setState(() {
+                      _isSaving = true;
+                    });
 
-                    // Generate reference number
-                    final refNumber = 'INV-${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}${DateTime.now().day.toString().padLeft(2, '0')}${DateTime.now().hour.toString().padLeft(2, '0')}${DateTime.now().second.toString().padLeft(2, '0')}';
-                    
-                    // Navigate to payment status screen
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => PaymentStatusScreen(
-                          event: newEvent,
-                          paidBy: widget.participants?.isNotEmpty == true
-                              ? widget.participants!.first.name
-                              : 'Pembayar',
-                          refNumber: refNumber,
-                        ),
-                      ),
-                    );
+                    try {
+                      final userId = FirebaseAuth.instance.currentUser!.uid;
+
+                      // Build detailed participant data with bill amounts
+                      final participantDetails = widget.participants?.map((p) {
+                        final amount = participantBills?[p.name] ?? 0.0;
+                        return {
+                          'name': p.name,
+                          'phone': p.phoneNumber,
+                          'amount': amount,
+                          'isPaid': false,
+                        };
+                      }).toList() ?? [];
+
+                      // Build detailed items data
+                      final itemDetails = widget.items?.map((item) {
+                        return {
+                          'name': item.name,
+                          'price': item.price,
+                          'quantity': item.quantity,
+                          'orderedBy': item.orderedBy,
+                        };
+                      }).toList() ?? [];
+
+                      // Save to Firestore with full details
+                      await FirebaseFirestore.instance.collection('events').add({
+                        'name': widget.eventName ?? 'Event',
+                        'location': widget.location ?? 'Lokasi',
+                        'date': widget.date != null ? Timestamp.fromDate(widget.date!) : Timestamp.now(),
+                        'createdBy': userId,
+                        'participants': participantDetails,
+                        'items': itemDetails,
+                        'totalAmount': totalAmount,
+                        'subtotal': subtotal,
+                        'isTaxEnabled': widget.isTaxEnabled,
+                        'taxPercent': widget.isTaxEnabled ? widget.taxPercent : 0.0,
+                        'status': 'Active',
+                        'paidCount': 0,
+                        'totalParticipants': widget.participants?.length ?? 0,
+                        'paymentStatus': 'Unpaid',
+                        'createdAt': FieldValue.serverTimestamp(),
+                      });
+
+                      if (mounted) {
+                        Navigator.of(context).pushAndRemoveUntil(
+                          MaterialPageRoute(builder: (context) => DashboardScreen()),
+                          (route) => false,
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Gagal menyimpan event: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    } finally {
+                      if (mounted) {
+                        setState(() {
+                          _isSaving = false;
+                        });
+                      }
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
@@ -448,14 +492,23 @@ class _ResultScreenState extends State<ResultScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: Text(
-                    'Simpan Event',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  child: _isSaving
+                      ? SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : Text(
+                          'Simpan Event',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                 ),
               ),
             ],

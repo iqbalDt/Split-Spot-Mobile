@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../models/event_model.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'event_detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -7,45 +8,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  List<Event> events = [
-    Event(
-      id: '1',
-      name: 'Dinner Bareng',
-      location: 'Sentosa Seafood',
-      date: DateTime(2023, 10, 12),
-      status: 'Active',
-      paidCount: 2,
-      totalParticipants: 4,
-      imageUrl: 'assets/dinner.jpg',
-      totalAmount: 200000,
-      paymentStatus: 'Paid',
-    ),
-    Event(
-      id: '2',
-      name: 'Ngopi Sore',
-      location: 'Kopi Kenangan',
-      date: DateTime(2023, 10, 10),
-      status: 'Active',
-      paidCount: 0,
-      totalParticipants: 3,
-      imageUrl: 'assets/coffee.jpg',
-      totalAmount: 45000,
-      paymentStatus: 'Unpaid',
-    ),
-    Event(
-      id: '3',
-      name: 'Gym Membership',
-      location: 'Celebrity Fitness',
-      date: DateTime(2023, 10, 1),
-      status: 'Active',
-      paidCount: 5,
-      totalParticipants: 6,
-      imageUrl: 'assets/gym.jpg',
-      totalAmount: 150000,
-      paymentStatus: 'Paid',
-    ),
-  ];
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -58,197 +20,256 @@ class _HomeScreenState extends State<HomeScreen> {
           Padding(
             padding: EdgeInsets.all(16),
             child: Icon(Icons.notifications),
-          )
+          ),
         ],
       ),
-      body: events.isEmpty
-          ? _buildEmptyState(context)
-          : ListView.builder(
-              padding: EdgeInsets.all(16),
-              itemCount: events.length,
-              itemBuilder: (context, index) {
-                return _buildEventCard(context, events[index]);
-              },
-            ),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('events')
+            .orderBy('createdAt', descending: true)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasError) {
+            return Center(
+              child: Text(
+                'Belum ada event',
+                style: TextStyle(fontSize: 16, color: Colors.grey),
+              ),
+            );
+          }
+
+          final docs = snapshot.data?.docs ?? [];
+
+          if (docs.isEmpty) {
+            return _buildEmptyState(context);
+          }
+
+          return ListView.builder(
+            padding: EdgeInsets.all(16),
+            itemCount: docs.length,
+            itemBuilder: (context, index) {
+              final docId = docs[index].id;
+              final data = docs[index].data() as Map<String, dynamic>;
+              return _buildEventCard(context, docId, data);
+            },
+          );
+        },
+      ),
     );
   }
 
-  Widget _buildEventCard(BuildContext context, Event event) {
-    return Card(
-      margin: EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+  void _navigateToDetail(BuildContext context, String docId, Map<String, dynamic> data) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EventDetailScreen(
+          eventId: docId,
+          eventData: data,
+        ),
       ),
-      child: Padding(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header dengan nama event dan status
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        event.name,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+    );
+  }
+
+  Widget _buildEventCard(BuildContext context, String docId, Map<String, dynamic> data) {
+    final name = data['name'] ?? '';
+    final location = data['location'] ?? '';
+    final date = (data['date'] as Timestamp?)?.toDate() ?? DateTime.now();
+    final totalAmount = (data['totalAmount'] ?? 0).toDouble();
+    final status = data['status'] ?? 'Active';
+    final paidCount = (data['paidCount'] ?? 0).toInt();
+    final totalParticipants = (data['totalParticipants'] ?? 1).toInt();
+    final paymentStatus = data['paymentStatus'] ?? 'Unpaid';
+
+    return GestureDetector(
+      onTap: () => _navigateToDetail(context, docId, data),
+      child: Card(
+        margin: EdgeInsets.only(bottom: 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        elevation: 2,
+        shadowColor: Colors.black.withOpacity(0.1),
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header dengan nama event dan status
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                      SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.location_on,
-                            size: 14,
-                            color: Colors.grey,
-                          ),
-                          SizedBox(width: 4),
-                          Text(
-                            event.location,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey,
+                        SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(Icons.location_on, size: 14, color: Colors.grey),
+                            SizedBox(width: 4),
+                            Text(
+                              location,
+                              style: TextStyle(fontSize: 12, color: Colors.grey),
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: event.status == 'Active' ? Colors.green : Colors.grey,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    event.status,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
+                          ],
+                        ),
+                      ],
                     ),
                   ),
-                ),
-              ],
-            ),
-            SizedBox(height: 8),
-            // Tanggal
-            Text(
-              'Tanggal: ${event.date.day} ${_getMonthName(event.date.month)} ${event.date.year}',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey,
-              ),
-            ),
-            SizedBox(height: 16),
-            // Progress bar pembayaran
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Pembayaran',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: event.paidCount / event.totalParticipants,
-                    minHeight: 8,
-                    backgroundColor: Colors.grey[300],
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 8),
-            // Informasi pembayaran dan partisipan
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  '${event.paidCount}/${event.totalParticipants} Paid',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.green,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Row(
-                  children: [
-                    // Placeholder untuk avatar placeholder
-                    Text(
-                      '+${event.totalParticipants}',
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: status == 'Active' ? Colors.green : Colors.grey,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      status,
                       style: TextStyle(
+                        color: Colors.white,
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: () {
-                        // Navigate to detail
-                      },
-                      child: Text(
-                        'Detail',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.green,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 8),
+              // Tanggal
+              Text(
+                'Tanggal: ${date.day} ${_getMonthName(date.month)} ${date.year}',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              SizedBox(height: 16),
+              // Progress bar pembayaran
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Pembayaran',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                  ),
+                  SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: totalParticipants > 0
+                          ? paidCount / totalParticipants
+                          : 0,
+                      minHeight: 8,
+                      backgroundColor: Colors.grey[300],
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
                     ),
-                  ],
-                )
-              ],
-            ),
-            SizedBox(height: 8),
-            // Total dan status pembayaran
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Total Tagihan: Rp ${(event.totalAmount / 1000).toStringAsFixed(0)}k',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
                   ),
-                ),
-                Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: event.paymentStatus == 'Paid'
-                        ? Colors.green
-                        : Colors.orange,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    event.paymentStatus == 'Paid' ? 'Bayar' : 'Belum Bayar',
+                ],
+              ),
+              SizedBox(height: 8),
+              // Informasi pembayaran dan partisipan
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '$paidCount/$totalParticipants Paid',
                     style: TextStyle(
-                      color: Colors.white,
                       fontSize: 12,
+                      color: Colors.green,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                ),
-              ],
-            ),
-          ],
+                  Row(
+                    children: [
+                      Text(
+                        '+$totalParticipants',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      // Styled detail button with icon
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Color(0xFF66BB6A), Color(0xFF388E3C)],
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Color(0xFF4CAF50).withOpacity(0.3),
+                              blurRadius: 6,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.visibility_rounded,
+                              size: 14,
+                              color: Colors.white,
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              'Detail',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            SizedBox(width: 2),
+                            Icon(
+                              Icons.arrow_forward_ios_rounded,
+                              size: 10,
+                              color: Colors.white.withOpacity(0.8),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              SizedBox(height: 8),
+              // Total dan status pembayaran
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Total Tagihan: Rp ${_formatRupiah(totalAmount)}',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                  ),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: paymentStatus == 'Paid'
+                          ? Colors.green
+                          : Colors.orange,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      paymentStatus == 'Paid' ? 'Bayar' : 'Belum Bayar',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -259,29 +280,29 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.event_note,
-            size: 64,
-            color: Colors.grey,
-          ),
+          Icon(Icons.event_note, size: 64, color: Colors.grey),
           SizedBox(height: 16),
           Text(
             'Belum ada event',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           SizedBox(height: 8),
           Text(
             'Buat event pertama Anda sekarang',
-            style: TextStyle(
-              color: Colors.grey,
-            ),
+            style: TextStyle(color: Colors.grey),
           ),
         ],
       ),
     );
+  }
+
+  String _formatRupiah(double amount) {
+    if (amount >= 1000000) {
+      return '${(amount / 1000000).toStringAsFixed(amount % 1000000 == 0 ? 0 : 1)}jt';
+    } else if (amount >= 1000) {
+      return '${(amount / 1000).toStringAsFixed(amount % 1000 == 0 ? 0 : 1)}k';
+    }
+    return amount.toStringAsFixed(0);
   }
 
   String _getMonthName(int month) {
@@ -297,7 +318,7 @@ class _HomeScreenState extends State<HomeScreen> {
       'Sep',
       'Okt',
       'Nov',
-      'Des'
+      'Des',
     ];
     return months[month - 1];
   }
