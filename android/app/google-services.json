@@ -12,7 +12,20 @@
           "package_name": "com.example.splitspot"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "991604351159-sjvfpicislejvtdal6ee0si93li2oieb.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.splitspot",
+            "certificate_hash": "4d98fe10e62d8c42b514521bfee15db4bb21c6cd"
+          }
+        },
+        {
+          "client_id": "991604351159-0vdck50d890i7noe2vvd6lplvqd06akk.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDmCEZWFs2H1_LgCt9Zfn6Tto4334b0eVI"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "991604351159-0vdck50d890i7noe2vvd6lplvqd06akk.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "991604351159-c3rcagdcvnglmie71206gd8v6tmfpuu6.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.splitspot"
+              }
+            }
+          ]
         }
       }
     }

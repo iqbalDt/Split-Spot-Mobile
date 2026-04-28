@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'result_screen.dart';
 import '../models/participant_model.dart';
 
@@ -304,8 +305,23 @@ class _ItemsScreenState extends State<ItemsScreen> {
                         TextField(
                           controller: priceController,
                           keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            CurrencyInputFormatter(),
+                          ],
                           decoration: InputDecoration(
-                            hintText: 'Rp 0',
+                            hintText: '0',
+                            prefixIcon: Padding(
+                              padding: EdgeInsets.only(left: 12, right: 8),
+                              child: Text(
+                                'Rp',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            prefixIconConstraints: BoxConstraints(minWidth: 0, minHeight: 0),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -552,9 +568,10 @@ class _ItemsScreenState extends State<ItemsScreen> {
                       return;
                     }
 
+                    final priceText = priceController.text.replaceAll('.', '');
                     final newItem = MenuItem(
                       name: nameController.text,
-                      price: int.parse(priceController.text),
+                      price: int.parse(priceText),
                       quantity: currentQuantity,
                       orderedBy: List<String>.from(selectedParticipants),
                     );
@@ -780,5 +797,30 @@ class _ItemsScreenState extends State<ItemsScreen> {
     priceController.dispose();
     taxController.dispose();
     super.dispose();
+  }
+}
+
+class CurrencyInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.text.isEmpty) {
+      return newValue.copyWith(text: '');
+    }
+
+    final numericOnly = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    final buffer = StringBuffer();
+    for (int i = 0; i < numericOnly.length; i++) {
+      if (i > 0 && (numericOnly.length - i) % 3 == 0) {
+        buffer.write('.');
+      }
+      buffer.write(numericOnly[i]);
+    }
+
+    final formattedString = buffer.toString();
+    return TextEditingValue(
+      text: formattedString,
+      selection: TextSelection.collapsed(offset: formattedString.length),
+    );
   }
 }

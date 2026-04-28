@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../models/event_model.dart';
+//import '../models/event_model.dart';
 import '../models/participant_model.dart';
 import '../models/bill_calculator.dart';
-import 'payment_status_screen.dart';
+//import 'payment_status_screen.dart';
 import 'dashboard_screen.dart';
 
 class ResultScreen extends StatefulWidget {
@@ -40,7 +40,7 @@ class _ResultScreenState extends State<ResultScreen> {
   Widget build(BuildContext context) {
     // ===== GLOBAL TAX CALCULATION FLOW =====
     // This section calculates the bill using global tax (not item-level)
-    
+
     // STEP 1: Calculate subtotal (sum of all items, NO tax)
     double subtotal = 0;
     if (widget.items != null) {
@@ -68,7 +68,7 @@ class _ResultScreenState extends State<ResultScreen> {
     //   c) Distributes tax proportionally to each participant
     Map<String, double>? participantBills;
     String? validationError;
-    
+
     if (widget.items != null && widget.items!.isNotEmpty) {
       participantBills = BillCalculator.calculateBillWithTotalTax(
         widget.items!,
@@ -111,10 +111,7 @@ class _ResultScreenState extends State<ResultScreen> {
                 alignment: Alignment.centerLeft,
                 child: Text(
                   'Step 4 dari 4',
-                  style: TextStyle(
-                    color: Colors.grey,
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: Colors.grey, fontSize: 12),
                 ),
               ),
               SizedBox(height: 16),
@@ -138,18 +135,22 @@ class _ResultScreenState extends State<ResultScreen> {
                       SizedBox(height: 8),
                       Row(
                         children: [
-                          Icon(Icons.location_on,
-                              size: 16, color: Colors.grey),
+                          Icon(Icons.location_on, size: 16, color: Colors.grey),
                           SizedBox(width: 8),
-                          Text(widget.location ?? 'Lokasi tidak diketahui',
-                              style: TextStyle(color: Colors.grey)),
+                          Text(
+                            widget.location ?? 'Lokasi tidak diketahui',
+                            style: TextStyle(color: Colors.grey),
+                          ),
                         ],
                       ),
                       SizedBox(height: 4),
                       Row(
                         children: [
-                          Icon(Icons.calendar_today,
-                              size: 16, color: Colors.grey),
+                          Icon(
+                            Icons.calendar_today,
+                            size: 16,
+                            color: Colors.grey,
+                          ),
                           SizedBox(width: 8),
                           Text(
                             widget.date != null
@@ -169,43 +170,42 @@ class _ResultScreenState extends State<ResultScreen> {
               if (widget.items != null && widget.items!.isNotEmpty) ...[
                 Text(
                   'Item-item',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 SizedBox(height: 12),
-                ...widget.items!.map((item) => Padding(
-                      padding: EdgeInsets.only(bottom: 8),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item.name,
-                                style: TextStyle(fontWeight: FontWeight.w600),
-                              ),
-                              Text(
-                                'x${item.quantity}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey,
-                                ),
-                              ),
-                            ],
-                          ),
-                          Text(
-                            'Rp ${item.totalPrice}',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: Colors.green,
+                ...widget.items!.map(
+                  (item) => Padding(
+                    padding: EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item.name,
+                              style: TextStyle(fontWeight: FontWeight.w600),
                             ),
+                            Text(
+                              'x${item.quantity}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          'Rp ${item.totalPrice}',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.green,
                           ),
-                        ],
-                      ),
-                    )),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
                 Divider(height: 20),
               ],
 
@@ -269,10 +269,7 @@ class _ResultScreenState extends State<ResultScreen> {
                     ],
                     // Divider
                     SizedBox(height: 12),
-                    Container(
-                      height: 1,
-                      color: Colors.grey[300],
-                    ),
+                    Container(height: 1, color: Colors.grey[300]),
                     // Grand total row
                     SizedBox(height: 12),
                     Row(
@@ -304,10 +301,7 @@ class _ResultScreenState extends State<ResultScreen> {
               // Participants and split
               Text(
                 'Peserta (${widget.participants?.length ?? 0})',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               SizedBox(height: 12),
               if (validationError != null)
@@ -321,10 +315,7 @@ class _ResultScreenState extends State<ResultScreen> {
                   ),
                   child: Text(
                     'Validation Error:\n$validationError',
-                    style: TextStyle(
-                      color: Colors.red,
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: Colors.red, fontSize: 12),
                   ),
                 )
               else if (widget.participants != null)
@@ -347,9 +338,7 @@ class _ResultScreenState extends State<ResultScreen> {
                             children: [
                               Text(
                                 participant.name,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                ),
+                                style: TextStyle(fontWeight: FontWeight.w600),
                               ),
                               if (participant.phoneNumber.isNotEmpty)
                                 Text(
@@ -389,10 +378,7 @@ class _ResultScreenState extends State<ResultScreen> {
                   children: [
                     Text(
                       'Rata-rata per orang',
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: Colors.grey, fontSize: 12),
                     ),
                     SizedBox(height: 4),
                     Text(
@@ -414,77 +400,94 @@ class _ResultScreenState extends State<ResultScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _isSaving ? null : () async {
-                    setState(() {
-                      _isSaving = true;
-                    });
+                  onPressed: _isSaving
+                      ? null
+                      : () async {
+                          setState(() {
+                            _isSaving = true;
+                          });
 
-                    try {
-                      final userId = FirebaseAuth.instance.currentUser!.uid;
+                          try {
+                            final userId =
+                                FirebaseAuth.instance.currentUser!.uid;
 
-                      // Build detailed participant data with bill amounts
-                      final participantDetails = widget.participants?.map((p) {
-                        final amount = participantBills?[p.name] ?? 0.0;
-                        return {
-                          'name': p.name,
-                          'phone': p.phoneNumber,
-                          'amount': amount,
-                          'isPaid': false,
-                        };
-                      }).toList() ?? [];
+                            // Build detailed participant data with bill amounts
+                            final participantDetails =
+                                widget.participants?.map((p) {
+                                  final amount =
+                                      participantBills?[p.name] ?? 0.0;
+                                  return {
+                                    'name': p.name,
+                                    'phone': p.phoneNumber,
+                                    'amount': amount,
+                                    'isPaid': false,
+                                  };
+                                }).toList() ??
+                                [];
 
-                      // Build detailed items data
-                      final itemDetails = widget.items?.map((item) {
-                        return {
-                          'name': item.name,
-                          'price': item.price,
-                          'quantity': item.quantity,
-                          'orderedBy': item.orderedBy,
-                        };
-                      }).toList() ?? [];
+                            // Build detailed items data
+                            final itemDetails =
+                                widget.items?.map((item) {
+                                  return {
+                                    'name': item.name,
+                                    'price': item.price,
+                                    'quantity': item.quantity,
+                                    'orderedBy': item.orderedBy,
+                                  };
+                                }).toList() ??
+                                [];
 
-                      // Save to Firestore with full details
-                      await FirebaseFirestore.instance.collection('events').add({
-                        'name': widget.eventName ?? 'Event',
-                        'location': widget.location ?? 'Lokasi',
-                        'date': widget.date != null ? Timestamp.fromDate(widget.date!) : Timestamp.now(),
-                        'createdBy': userId,
-                        'participants': participantDetails,
-                        'items': itemDetails,
-                        'totalAmount': totalAmount,
-                        'subtotal': subtotal,
-                        'isTaxEnabled': widget.isTaxEnabled,
-                        'taxPercent': widget.isTaxEnabled ? widget.taxPercent : 0.0,
-                        'status': 'Active',
-                        'paidCount': 0,
-                        'totalParticipants': widget.participants?.length ?? 0,
-                        'paymentStatus': 'Unpaid',
-                        'createdAt': FieldValue.serverTimestamp(),
-                      });
+                            // Save to Firestore with full details
+                            await FirebaseFirestore.instance
+                                .collection('events')
+                                .add({
+                                  'name': widget.eventName ?? 'Event',
+                                  'location': widget.location ?? 'Lokasi',
+                                  'date': widget.date != null
+                                      ? Timestamp.fromDate(widget.date!)
+                                      : Timestamp.now(),
+                                  'createdBy': userId,
+                                  'participants': participantDetails,
+                                  'items': itemDetails,
+                                  'totalAmount': totalAmount,
+                                  'subtotal': subtotal,
+                                  'isTaxEnabled': widget.isTaxEnabled,
+                                  'taxPercent': widget.isTaxEnabled
+                                      ? widget.taxPercent
+                                      : 0.0,
+                                  'status': 'Active',
+                                  'paidCount': 0,
+                                  'totalParticipants':
+                                      widget.participants?.length ?? 0,
+                                  'paymentStatus': 'Unpaid',
+                                  'createdAt': FieldValue.serverTimestamp(),
+                                });
 
-                      if (mounted) {
-                        Navigator.of(context).pushAndRemoveUntil(
-                          MaterialPageRoute(builder: (context) => DashboardScreen()),
-                          (route) => false,
-                        );
-                      }
-                    } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Gagal menyimpan event: $e'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
-                    } finally {
-                      if (mounted) {
-                        setState(() {
-                          _isSaving = false;
-                        });
-                      }
-                    }
-                  },
+                            if (mounted) {
+                              Navigator.of(context).pushAndRemoveUntil(
+                                MaterialPageRoute(
+                                  builder: (context) => DashboardScreen(),
+                                ),
+                                (route) => false,
+                              );
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Gagal menyimpan event: $e'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          } finally {
+                            if (mounted) {
+                              setState(() {
+                                _isSaving = false;
+                              });
+                            }
+                          }
+                        },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
                     padding: EdgeInsets.symmetric(vertical: 16),

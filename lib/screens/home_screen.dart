@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'event_detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -10,6 +11,17 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    debugPrint('=== HomeScreen: currentUser UID = ${currentUser?.uid} ===');
+
+    if (currentUser == null) {
+      return Scaffold(
+        body: Center(
+          child: Text('Silakan login terlebih dahulu'),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text("Event Saya"),
@@ -26,7 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('events')
-            .orderBy('createdAt', descending: true)
+            .where('createdBy', isEqualTo: currentUser.uid)
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -34,10 +46,27 @@ class _HomeScreenState extends State<HomeScreen> {
           }
 
           if (snapshot.hasError) {
+            debugPrint('=== Firestore Error: ${snapshot.error} ===');
             return Center(
-              child: Text(
-                'Belum ada event',
-                style: TextStyle(fontSize: 16, color: Colors.grey),
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.error_outline, size: 48, color: Colors.red),
+                    SizedBox(height: 16),
+                    Text(
+                      'Gagal memuat event',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      '${snapshot.error}',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
               ),
             );
           }
@@ -47,6 +76,18 @@ class _HomeScreenState extends State<HomeScreen> {
           if (docs.isEmpty) {
             return _buildEmptyState(context);
           }
+
+          // Sort client-side by createdAt descending
+          docs.sort((a, b) {
+            final aData = a.data() as Map<String, dynamic>;
+            final bData = b.data() as Map<String, dynamic>;
+            final aTime = aData['createdAt'] as Timestamp?;
+            final bTime = bData['createdAt'] as Timestamp?;
+            if (aTime == null && bTime == null) return 0;
+            if (aTime == null) return 1;
+            if (bTime == null) return -1;
+            return bTime.compareTo(aTime);
+          });
 
           return ListView.builder(
             padding: EdgeInsets.all(16),
