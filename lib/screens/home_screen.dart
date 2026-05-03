@@ -28,12 +28,6 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0,
-        actions: [
-          Padding(
-            padding: EdgeInsets.all(16),
-            child: Icon(Icons.notifications),
-          ),
-        ],
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
@@ -89,12 +83,22 @@ class _HomeScreenState extends State<HomeScreen> {
             return bTime.compareTo(aTime);
           });
 
+          // Filter out completed events (they go to Activity screen)
+          final activeDocs = docs.where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            return data['status'] != 'Completed';
+          }).toList();
+
+          if (activeDocs.isEmpty) {
+            return _buildEmptyState(context);
+          }
+
           return ListView.builder(
             padding: EdgeInsets.all(16),
-            itemCount: docs.length,
+            itemCount: activeDocs.length,
             itemBuilder: (context, index) {
-              final docId = docs[index].id;
-              final data = docs[index].data() as Map<String, dynamic>;
+              final docId = activeDocs[index].id;
+              final data = activeDocs[index].data() as Map<String, dynamic>;
               return _buildEventCard(context, docId, data);
             },
           );

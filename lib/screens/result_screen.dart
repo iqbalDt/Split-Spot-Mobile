@@ -443,6 +443,7 @@ class _ResultScreenState extends State<ResultScreen> {
                                 .add({
                                   'name': widget.eventName ?? 'Event',
                                   'location': widget.location ?? 'Lokasi',
+                                  'googleMapsLink': widget.googleMapsLink ?? '',
                                   'date': widget.date != null
                                       ? Timestamp.fromDate(widget.date!)
                                       : Timestamp.now(),

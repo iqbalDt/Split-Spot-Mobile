@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
 import 'activity_screen.dart';
-import 'summary_screen.dart';
+import 'notification_screen.dart';
 import 'profile_screen.dart';
 import 'create_event_screen.dart';
 
@@ -29,7 +29,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     NavItem(icon: Icons.home, label: 'Home'),
     NavItem(icon: Icons.history, label: 'Activity'),
     NavItem(icon: Icons.add, label: 'Create'),
-    NavItem(icon: Icons.assessment, label: 'Summary'),
+    NavItem(icon: Icons.notifications, label: 'Notification'),
     NavItem(icon: Icons.person, label: 'Profile'),
   ];
 
@@ -40,7 +40,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     _screens = [
       _buildNavigator(0, HomeScreen()),
       _buildNavigator(1, ActivityScreen()),
-      _buildNavigator(2, SummaryScreen()),
+      _buildNavigator(2, NotificationScreen()),
       _buildNavigator(3, ProfileScreen()),
     ];
 
