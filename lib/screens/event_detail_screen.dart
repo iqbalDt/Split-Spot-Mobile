@@ -1083,9 +1083,10 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         final String phone = participant['phone'] ?? '';
         final double amount = (participant['amount'] ?? 0).toDouble();
         final bool isPaid = participant['isPaid'] ?? false;
+        final bool isAdmin = participant['isAdmin'] ?? false;
 
         // Generate avatar color from name
-        final avatarColor = _getAvatarColor(participantName);
+        final avatarColor = isAdmin ? const Color(0xFF388E3C) : _getAvatarColor(participantName);
         final initials = _getInitials(participantName);
 
         return Container(
@@ -1142,23 +1143,47 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                     children: [
                       Row(
                         children: [
-                          Expanded(
+                          Flexible(
                             child: Text(
                               participantName,
                               style: const TextStyle(
                                 fontWeight: FontWeight.w600,
                                 fontSize: 15,
                               ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          Text(
-                            '#${index + 1}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[400],
-                              fontWeight: FontWeight.w500,
+                          if (isAdmin) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFF66BB6A), Color(0xFF43A047)],
+                                ),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: const [
+                                  Icon(Icons.shield_rounded, size: 10, color: Colors.white),
+                                  SizedBox(width: 3),
+                                  Text('Admin', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white)),
+                                ],
+                              ),
                             ),
-                          ),
+                          ],
+                          if (!isAdmin) ...[
+                            const SizedBox(width: 4),
+                            Text(
+                              '#${index + 1}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[400],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                       if (phone.isNotEmpty) ...[
@@ -1189,8 +1214,8 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              // QRIS button (only for unpaid)
-                              if (!isPaid)
+                              // QRIS button (only for unpaid NON-admin)
+                              if (!isPaid && !isAdmin)
                                 GestureDetector(
                                   onTap: () => _showQrisDialog(
                                     context,
@@ -1230,7 +1255,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                                 ),
                               // Payment status badge
                               GestureDetector(
-                                onTap: () => _togglePaymentStatus(index),
+                                onTap: isAdmin ? null : () => _togglePaymentStatus(index),
                                 child: AnimatedContainer(
                                   duration: const Duration(milliseconds: 300),
                                   padding: const EdgeInsets.symmetric(
@@ -1238,35 +1263,41 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                                     vertical: 7,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: isPaid
-                                        ? Colors.green
-                                        : Colors.orange.withOpacity(0.1),
+                                    color: isAdmin
+                                        ? const Color(0xFF388E3C)
+                                        : (isPaid
+                                            ? Colors.green
+                                            : Colors.orange.withOpacity(0.1)),
                                     borderRadius: BorderRadius.circular(20),
                                     border: Border.all(
-                                      color: isPaid
-                                          ? Colors.green
-                                          : Colors.orange.withOpacity(0.4),
+                                      color: isAdmin
+                                          ? const Color(0xFF388E3C)
+                                          : (isPaid
+                                              ? Colors.green
+                                              : Colors.orange.withOpacity(0.4)),
                                     ),
                                   ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Icon(
-                                        isPaid
-                                            ? Icons.check_circle
-                                            : Icons.schedule,
+                                        isAdmin
+                                            ? Icons.shield_rounded
+                                            : (isPaid
+                                                ? Icons.check_circle
+                                                : Icons.schedule),
                                         size: 14,
-                                        color: isPaid
+                                        color: isAdmin || isPaid
                                             ? Colors.white
                                             : Colors.orange,
                                       ),
                                       const SizedBox(width: 5),
                                       Text(
-                                        isPaid ? 'Lunas' : 'Belum',
+                                        isAdmin ? 'Admin' : (isPaid ? 'Lunas' : 'Belum'),
                                         style: TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w600,
-                                          color: isPaid
+                                          color: isAdmin || isPaid
                                               ? Colors.white
                                               : Colors.orange[800],
                                         ),

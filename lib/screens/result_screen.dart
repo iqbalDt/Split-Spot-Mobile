@@ -327,35 +327,105 @@ class _ResultScreenState extends State<ResultScreen> {
                     child: Container(
                       padding: EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey[300]!),
+                        color: participant.isAdmin
+                            ? Color(0xFFF1F8E9)
+                            : Colors.white,
+                        border: Border.all(
+                          color: participant.isAdmin
+                              ? Color(0xFF66BB6A).withOpacity(0.5)
+                              : Colors.grey[300]!,
+                        ),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        participant.name,
+                                        style: TextStyle(fontWeight: FontWeight.w600),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    if (participant.isAdmin) ...[
+                                      SizedBox(width: 6),
+                                      Container(
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: 7,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            colors: [Color(0xFF66BB6A), Color(0xFF43A047)],
+                                          ),
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.shield_rounded,
+                                                size: 10, color: Colors.white),
+                                            SizedBox(width: 3),
+                                            Text(
+                                              'Admin',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w700,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                if (participant.phoneNumber.isNotEmpty)
+                                  Text(
+                                    participant.phoneNumber,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                if (participant.isAdmin)
+                                  Text(
+                                    'Otomatis lunas • Penanggung jawab',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Color(0xFF388E3C).withOpacity(0.7),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
                           Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               Text(
-                                participant.name,
-                                style: TextStyle(fontWeight: FontWeight.w600),
+                                'Rp ${participantAmount.toStringAsFixed(0)}',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.green,
+                                ),
                               ),
-                              if (participant.phoneNumber.isNotEmpty)
+                              if (participant.isAdmin)
                                 Text(
-                                  participant.phoneNumber,
+                                  '✓ Lunas',
                                   style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey,
+                                    fontSize: 11,
+                                    color: Color(0xFF388E3C),
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                             ],
-                          ),
-                          Text(
-                            'Rp ${participantAmount.toStringAsFixed(0)}',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: Colors.green,
-                            ),
                           ),
                         ],
                       ),
@@ -412,6 +482,7 @@ class _ResultScreenState extends State<ResultScreen> {
                                 FirebaseAuth.instance.currentUser!.uid;
 
                             // Build detailed participant data with bill amounts
+                            // Admin participants are auto-marked as paid
                             final participantDetails =
                                 widget.participants?.map((p) {
                                   final amount =
@@ -420,10 +491,21 @@ class _ResultScreenState extends State<ResultScreen> {
                                     'name': p.name,
                                     'phone': p.phoneNumber,
                                     'amount': amount,
-                                    'isPaid': false,
+                                    'isPaid': p.isAdmin, // Admin = auto lunas
+                                    'isAdmin': p.isAdmin,
                                   };
                                 }).toList() ??
                                 [];
+
+                            // Count admins for initial paidCount
+                            final adminCount = widget.participants
+                                    ?.where((p) => p.isAdmin)
+                                    .length ??
+                                0;
+                            final totalP = widget.participants?.length ?? 0;
+                            final initialStatus = adminCount >= totalP && totalP > 0
+                                ? 'Paid'
+                                : 'Unpaid';
 
                             // Build detailed items data
                             final itemDetails =
@@ -456,11 +538,12 @@ class _ResultScreenState extends State<ResultScreen> {
                                   'taxPercent': widget.isTaxEnabled
                                       ? widget.taxPercent
                                       : 0.0,
-                                  'status': 'Active',
-                                  'paidCount': 0,
-                                  'totalParticipants':
-                                      widget.participants?.length ?? 0,
-                                  'paymentStatus': 'Unpaid',
+                                  'status': adminCount >= totalP && totalP > 0
+                                      ? 'Completed'
+                                      : 'Active',
+                                  'paidCount': adminCount,
+                                  'totalParticipants': totalP,
+                                  'paymentStatus': initialStatus,
                                   'createdAt': FieldValue.serverTimestamp(),
                                 });
 

@@ -46,7 +46,7 @@ class _NotificationScreenState extends State<NotificationScreen> with SingleTick
       final st = data['status'] ?? 'Active'; final ca = (data['createdAt'] as Timestamp?)?.toDate() ?? now;
       final ps = (data['participants'] as List?) ?? []; final pc = (data['paidCount'] ?? 0).toInt(); final tp = (data['totalParticipants'] ?? ps.length).toInt();
       if (st == 'Active') {
-        for (final p in ps) { if (p is Map<String, dynamic> && p['isPaid'] != true) {
+        for (final p in ps) { if (p is Map<String, dynamic> && p['isPaid'] != true && p['isAdmin'] != true) {
           final nm = p['name'] ?? 'Peserta'; final am = (p['amount'] ?? 0).toDouble();
           final dur = now.difference(ca); final dt = _fmtDur(dur); final urg = dur.inDays >= 3;
           n.add(NotifItem(id: '${eid}_unpaid_$nm', title: '$nm belum membayar', description: 'Belum membayar Rp ${_fmtNum(am)} untuk "$en" selama $dt',

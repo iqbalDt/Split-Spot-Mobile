@@ -1,10 +1,12 @@
 class Participant {
   final String name;
   final String phoneNumber;
+  final bool isAdmin;
 
   Participant({
     required this.name,
     required this.phoneNumber,
+    this.isAdmin = false,
   });
 }
 
