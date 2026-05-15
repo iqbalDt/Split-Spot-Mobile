@@ -1,6 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:http/http.dart' as http;
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class EventDetailScreen extends StatefulWidget {
   final String eventId;
@@ -35,7 +39,10 @@ class _EventDetailScreenState extends State<EventDetailScreen>
   }
 
   // Toggle payment status for a participant
-  Future<void> _togglePaymentStatus(int participantIndex, {bool closeSheet = false}) async {
+  Future<void> _togglePaymentStatus(
+    int participantIndex, {
+    bool closeSheet = false,
+  }) async {
     final participants = List<Map<String, dynamic>>.from(
       (_eventData['participants'] as List?)?.map(
             (p) => p is Map<String, dynamic>
@@ -71,11 +78,11 @@ class _EventDetailScreenState extends State<EventDetailScreen>
           .collection('events')
           .doc(widget.eventId)
           .update({
-        'participants': participants,
-        'paidCount': paidCount,
-        'paymentStatus': paymentStatus,
-        'status': status,
-      });
+            'participants': participants,
+            'paidCount': paidCount,
+            'paymentStatus': paymentStatus,
+            'status': status,
+          });
 
       setState(() {
         _eventData['participants'] = participants;
@@ -95,12 +102,16 @@ class _EventDetailScreenState extends State<EventDetailScreen>
               children: [
                 Icon(Icons.celebration, color: Colors.white, size: 20),
                 SizedBox(width: 8),
-                Text('Semua peserta sudah bayar! Event selesai 🎉'),
+                Expanded(
+                  child: Text('Semua peserta sudah bayar! Event selesai 🎉'),
+                ),
               ],
             ),
             backgroundColor: const Color(0xFF388E3C),
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             duration: const Duration(seconds: 3),
           ),
         );
@@ -117,10 +128,63 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     }
   }
 
+  // Generate Xendit QRIS
+  Future<String?> _generateXenditQRIS(
+    double amount,
+    String participantName,
+  ) async {
+    // TODO: Ganti dengan Secret Key Xendit Anda (Test/Live)
+    // Ingat: Jangan simpan Secret Key langsung di aplikasi untuk Production!
+    const String xenditSecretKey =
+        'xnd_development_zpVl3pSPbIc2SPTW5Uc114lKW4Ms3YzJdCz8cUi0pkjYAMsDXo5kGovaZl9sqY';
+
+    // Auth header
+    final String basicAuth =
+        'Basic ' + base64Encode(utf8.encode('$xenditSecretKey:'));
+
+    try {
+      final response = await http.post(
+        Uri.parse('https://api.xendit.co/qr_codes'),
+        headers: {
+          'Authorization': basicAuth,
+          'Content-Type': 'application/json',
+          'api-version': '2022-07-31',
+        },
+        body: jsonEncode({
+          'reference_id':
+              '${widget.eventId}-${DateTime.now().millisecondsSinceEpoch}',
+          'type': 'DYNAMIC',
+          'currency': 'IDR',
+          'amount': amount.toInt(),
+        }),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(response.body);
+        return data['qr_string'];
+      } else {
+        debugPrint('Xendit Error: ${response.body}');
+        return 'ERROR: ${response.body}';
+      }
+    } catch (e) {
+      debugPrint('Xendit Exception: $e');
+      return 'ERROR: $e';
+    }
+  }
+
   // Show QRIS dialog for payment with toggle
-  void _showQrisDialog(BuildContext context, String participantName, double amount, int participantIndex) {
-    final isPaid = (_eventData['participants'] as List?)?.elementAt(participantIndex) is Map
-        ? ((_eventData['participants'] as List).elementAt(participantIndex) as Map)['isPaid'] ?? false
+  void _showQrisDialog(
+    BuildContext context,
+    String participantName,
+    double amount,
+    int participantIndex,
+  ) {
+    final isPaid =
+        (_eventData['participants'] as List?)?.elementAt(participantIndex)
+            is Map
+        ? ((_eventData['participants'] as List).elementAt(participantIndex)
+                  as Map)['isPaid'] ??
+              false
         : false;
 
     showModalBottomSheet(
@@ -130,8 +194,54 @@ class _EventDetailScreenState extends State<EventDetailScreen>
       builder: (sheetContext) {
         bool toggleValue = isPaid;
         bool isUpdating = false;
+        String? qrisString;
+        String? errorMessage;
+        bool isLoadingQris = true;
+        bool hasQrisError = false;
+        String? bankName;
+        String? bankAccount;
+        bool isLoadingBank = true;
+
         return StatefulBuilder(
           builder: (builderContext, setSheetState) {
+            // Fetch once
+            if (isLoadingQris && qrisString == null && !hasQrisError) {
+              _generateXenditQRIS(amount, participantName).then((result) {
+                if (builderContext.mounted) {
+                  setSheetState(() {
+                    if (result != null && !result.startsWith('ERROR:')) {
+                      qrisString = result;
+                    } else {
+                      hasQrisError = true;
+                      errorMessage = result?.replaceFirst('ERROR: ', '');
+                    }
+                    isLoadingQris = false;
+                  });
+                }
+              });
+
+              // Fetch creator's bank info
+              final userId = _eventData['userId'] ?? FirebaseAuth.instance.currentUser?.uid;
+              if (userId != null) {
+                FirebaseFirestore.instance.collection('users').doc(userId).get().then((doc) {
+                  if (builderContext.mounted) {
+                    setSheetState(() {
+                      if (doc.exists) {
+                        bankName = doc.data()?['bankName']?.toString();
+                        bankAccount = doc.data()?['bankAccount']?.toString();
+                      }
+                      isLoadingBank = false;
+                    });
+                  }
+                }).catchError((_) {
+                  if (builderContext.mounted) {
+                    setSheetState(() => isLoadingBank = false);
+                  }
+                });
+              } else {
+                isLoadingBank = false;
+              }
+            }
             return Container(
               padding: const EdgeInsets.all(24),
               decoration: const BoxDecoration(
@@ -179,17 +289,14 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                     ),
                   ),
                   const SizedBox(height: 24),
-                  // QRIS placeholder box
+                  // QRIS box
                   Container(
                     width: 200,
                     height: 200,
                     decoration: BoxDecoration(
-                      color: Colors.grey[50],
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: Colors.grey[200]!,
-                        width: 2,
-                      ),
+                      border: Border.all(color: Colors.grey[200]!, width: 2),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withOpacity(0.04),
@@ -198,36 +305,95 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                         ),
                       ],
                     ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.qr_code_2_rounded,
-                          size: 56,
-                          color: Colors.grey[300],
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          'Coming Soon',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.grey[400],
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Fitur QRIS segera hadir',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey[400],
-                          ),
-                        ),
-                      ],
+                    child: Center(
+                      child: isLoadingQris
+                          ? const CircularProgressIndicator(
+                              color: Color(0xFF388E3C),
+                            )
+                          : (qrisString != null
+                                ? QrImageView(
+                                    data: qrisString!,
+                                    version: QrVersions.auto,
+                                    size: 180.0,
+                                  )
+                                : Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.error_outline,
+                                          size: 32,
+                                          color: Colors.red[300],
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'Gagal memuat QRIS',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.grey[700],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          errorMessage ?? 'Unknown error',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            color: Colors.red[400],
+                                          ),
+                                          textAlign: TextAlign.center,
+                                          maxLines: 4,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
+                                  )),
                     ),
                   ),
                   const SizedBox(height: 20),
+                  // Bank info box
+                  if (isLoadingBank)
+                    const Center(
+                      child: SizedBox(
+                        width: 20, height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF388E3C)),
+                      ),
+                    )
+                  else if (bankName != null && bankName!.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      margin: const EdgeInsets.only(bottom: 20),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF388E3C).withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF388E3C).withOpacity(0.2)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.account_balance_wallet_rounded,
+                            color: Color(0xFF388E3C),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              '$bankName : ${bankAccount ?? '-'}',
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF2E7D32),
+                              ),
+                              textAlign: TextAlign.center,
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 2,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   // Divider with "atau" text
                   Row(
                     children: [
@@ -250,7 +416,10 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                   // Payment toggle card
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 300),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
                     decoration: BoxDecoration(
                       color: toggleValue
                           ? const Color(0xFF388E3C).withOpacity(0.08)
@@ -278,7 +447,9 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                             toggleValue
                                 ? Icons.check_circle_rounded
                                 : Icons.payment_rounded,
-                            color: toggleValue ? const Color(0xFF388E3C) : Colors.orange,
+                            color: toggleValue
+                                ? const Color(0xFF388E3C)
+                                : Colors.orange,
                             size: 22,
                           ),
                         ),
@@ -327,15 +498,21 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                                     setSheetState(() {
                                       isUpdating = true;
                                     });
-                                    await _togglePaymentStatus(participantIndex, closeSheet: false);
+                                    await _togglePaymentStatus(
+                                      participantIndex,
+                                      closeSheet: false,
+                                    );
                                     setSheetState(() {
                                       toggleValue = !toggleValue;
                                       isUpdating = false;
                                     });
                                     // Auto-close after a brief delay if turned on
                                     if (toggleValue && mounted) {
-                                      await Future.delayed(const Duration(milliseconds: 600));
-                                      if (mounted && Navigator.of(sheetContext).canPop()) {
+                                      await Future.delayed(
+                                        const Duration(milliseconds: 600),
+                                      );
+                                      if (mounted &&
+                                          Navigator.of(sheetContext).canPop()) {
                                         Navigator.pop(sheetContext);
                                       }
                                     }
@@ -382,13 +559,13 @@ class _EventDetailScreenState extends State<EventDetailScreen>
       },
     );
   }
+
   @override
   Widget build(BuildContext context) {
     final name = _eventData['name'] ?? 'Event';
     final location = _eventData['location'] ?? '';
     final googleMapsLink = _eventData['googleMapsLink'] ?? '';
-    final date =
-        (_eventData['date'] as Timestamp?)?.toDate() ?? DateTime.now();
+    final date = (_eventData['date'] as Timestamp?)?.toDate() ?? DateTime.now();
     final totalAmount = (_eventData['totalAmount'] ?? 0).toDouble();
     final subtotal = (_eventData['subtotal'] ?? totalAmount).toDouble();
     final status = _eventData['status'] ?? 'Active';
@@ -402,7 +579,12 @@ class _EventDetailScreenState extends State<EventDetailScreen>
       if (p is Map<String, dynamic>) {
         return Map<String, dynamic>.from(p);
       }
-      return {'name': p.toString(), 'phone': '', 'amount': 0.0, 'isPaid': false};
+      return {
+        'name': p.toString(),
+        'phone': '',
+        'amount': 0.0,
+        'isPaid': false,
+      };
     }).toList();
 
     // Parse items
@@ -433,7 +615,11 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                   color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                child: const Icon(
+                  Icons.arrow_back,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
               onPressed: () => Navigator.pop(context),
             ),
@@ -456,7 +642,9 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                         // Status badge
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 4),
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: status == 'Active'
                                 ? Colors.white.withOpacity(0.25)
@@ -489,9 +677,11 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                         // Location & date row
                         Row(
                           children: [
-                            Icon(Icons.location_on,
-                                size: 14,
-                                color: Colors.white.withOpacity(0.8)),
+                            Icon(
+                              Icons.location_on,
+                              size: 14,
+                              color: Colors.white.withOpacity(0.8),
+                            ),
                             const SizedBox(width: 4),
                             Flexible(
                               child: GestureDetector(
@@ -499,28 +689,48 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                                     ? () async {
                                         try {
                                           var link = googleMapsLink.trim();
-                                          if (!link.startsWith('http://') && !link.startsWith('https://')) {
+                                          if (!link.startsWith('http://') &&
+                                              !link.startsWith('https://')) {
                                             link = 'https://' + link;
                                           }
                                           final Uri url = Uri.parse(link);
                                           bool launched = false;
                                           // Try external browser first
                                           try {
-                                            launched = await launchUrl(url, mode: LaunchMode.externalApplication);
+                                            launched = await launchUrl(
+                                              url,
+                                              mode: LaunchMode
+                                                  .externalApplication,
+                                            );
                                           } catch (_) {}
                                           // Fallback to platform default (opens in-app browser)
                                           if (!launched) {
-                                            launched = await launchUrl(url, mode: LaunchMode.platformDefault);
+                                            launched = await launchUrl(
+                                              url,
+                                              mode: LaunchMode.platformDefault,
+                                            );
                                           }
                                           if (!launched && mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              const SnackBar(content: Text('Tidak dapat membuka link')),
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Tidak dapat membuka link',
+                                                ),
+                                              ),
                                             );
                                           }
                                         } catch (e) {
                                           if (mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              const SnackBar(content: Text('Link tidak valid atau tidak didukung')),
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Link tidak valid atau tidak didukung',
+                                                ),
+                                              ),
                                             );
                                           }
                                         }
@@ -534,16 +744,20 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                                     decoration: googleMapsLink.isNotEmpty
                                         ? TextDecoration.underline
                                         : TextDecoration.none,
-                                    decorationColor: Colors.white.withOpacity(0.9),
+                                    decorationColor: Colors.white.withOpacity(
+                                      0.9,
+                                    ),
                                   ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ),
                             const SizedBox(width: 12),
-                            Icon(Icons.calendar_today,
-                                size: 14,
-                                color: Colors.white.withOpacity(0.8)),
+                            Icon(
+                              Icons.calendar_today,
+                              size: 14,
+                              color: Colors.white.withOpacity(0.8),
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               '${date.day} ${_getMonthName(date.month)} ${date.year}',
@@ -558,12 +772,15 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                         // Total amount
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 10),
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.15),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                                color: Colors.white.withOpacity(0.2)),
+                              color: Colors.white.withOpacity(0.2),
+                            ),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -593,7 +810,9 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                               if (isTaxEnabled && taxPercent > 0)
                                 Container(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 4),
+                                    horizontal: 10,
+                                    vertical: 4,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: Colors.orange.withOpacity(0.3),
                                     borderRadius: BorderRadius.circular(8),
@@ -624,7 +843,10 @@ class _EventDetailScreenState extends State<EventDetailScreen>
               children: [
                 // Payment Progress Card
                 _buildPaymentProgressCard(
-                    paidCount, totalParticipants, paymentStatus),
+                  paidCount,
+                  totalParticipants,
+                  paymentStatus,
+                ),
 
                 // Tab Bar
                 Container(
@@ -687,8 +909,13 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                 // Tab 1: Peserta
                 _buildParticipantsTab(participants, totalAmount),
                 // Tab 2: Menu
-                _buildItemsTab(items, subtotal, isTaxEnabled, taxPercent,
-                    totalAmount),
+                _buildItemsTab(
+                  items,
+                  subtotal,
+                  isTaxEnabled,
+                  taxPercent,
+                  totalAmount,
+                ),
               ],
             ),
           ),
@@ -698,9 +925,11 @@ class _EventDetailScreenState extends State<EventDetailScreen>
   }
 
   Widget _buildPaymentProgressCard(
-      int paidCount, int totalParticipants, String paymentStatus) {
-    double progress =
-        totalParticipants > 0 ? paidCount / totalParticipants : 0;
+    int paidCount,
+    int totalParticipants,
+    String paymentStatus,
+  ) {
+    double progress = totalParticipants > 0 ? paidCount / totalParticipants : 0;
     bool allPaid = paymentStatus == 'Paid';
 
     return Container(
@@ -766,8 +995,10 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                 ],
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: allPaid
                       ? Colors.green.withOpacity(0.1)
@@ -820,7 +1051,9 @@ class _EventDetailScreenState extends State<EventDetailScreen>
   }
 
   Widget _buildParticipantsTab(
-      List<Map<String, dynamic>> participants, double totalAmount) {
+    List<Map<String, dynamic>> participants,
+    double totalAmount,
+  ) {
     if (participants.isEmpty) {
       return Center(
         child: Column(
@@ -884,10 +1117,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                   height: 48,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [
-                        avatarColor,
-                        avatarColor.withOpacity(0.7),
-                      ],
+                      colors: [avatarColor, avatarColor.withOpacity(0.7)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -946,9 +1176,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            amount > 0
-                                ? 'Rp ${_formatNumber(amount)}'
-                                : 'Rp -',
+                            amount > 0 ? 'Rp ${_formatNumber(amount)}' : 'Rp -',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 15,
@@ -964,20 +1192,30 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                               // QRIS button (only for unpaid)
                               if (!isPaid)
                                 GestureDetector(
-                                  onTap: () => _showQrisDialog(context, participantName, amount, index),
+                                  onTap: () => _showQrisDialog(
+                                    context,
+                                    participantName,
+                                    amount,
+                                    index,
+                                  ),
                                   child: Container(
                                     padding: const EdgeInsets.all(8),
                                     margin: const EdgeInsets.only(right: 8),
                                     decoration: BoxDecoration(
                                       gradient: const LinearGradient(
-                                        colors: [Color(0xFF42A5F5), Color(0xFF1E88E5)],
+                                        colors: [
+                                          Color(0xFF42A5F5),
+                                          Color(0xFF1E88E5),
+                                        ],
                                         begin: Alignment.topLeft,
                                         end: Alignment.bottomRight,
                                       ),
                                       borderRadius: BorderRadius.circular(12),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: const Color(0xFF1E88E5).withOpacity(0.3),
+                                          color: const Color(
+                                            0xFF1E88E5,
+                                          ).withOpacity(0.3),
                                           blurRadius: 6,
                                           offset: const Offset(0, 2),
                                         ),
@@ -996,7 +1234,9 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                                 child: AnimatedContainer(
                                   duration: const Duration(milliseconds: 300),
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 14, vertical: 7),
+                                    horizontal: 14,
+                                    vertical: 7,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: isPaid
                                         ? Colors.green
@@ -1016,8 +1256,9 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                                             ? Icons.check_circle
                                             : Icons.schedule,
                                         size: 14,
-                                        color:
-                                            isPaid ? Colors.white : Colors.orange,
+                                        color: isPaid
+                                            ? Colors.white
+                                            : Colors.orange,
                                       ),
                                       const SizedBox(width: 5),
                                       Text(
@@ -1074,10 +1315,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
             const SizedBox(height: 4),
             Text(
               'Data menu tersedia untuk event baru',
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey[400],
-              ),
+              style: TextStyle(fontSize: 13, color: Colors.grey[400]),
             ),
           ],
         ),
@@ -1210,13 +1448,18 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                             children: orderedBy.map((name) {
                               return Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 5),
+                                  horizontal: 10,
+                                  vertical: 5,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: _getAvatarColor(name).withOpacity(0.15),
+                                  color: _getAvatarColor(
+                                    name,
+                                  ).withOpacity(0.15),
                                   borderRadius: BorderRadius.circular(20),
                                   border: Border.all(
-                                    color:
-                                        _getAvatarColor(name).withOpacity(0.3),
+                                    color: _getAvatarColor(
+                                      name,
+                                    ).withOpacity(0.3),
                                   ),
                                 ),
                                 child: Row(
@@ -1240,8 +1483,9 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                                       style: TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.w500,
-                                        color: _getAvatarColor(name)
-                                            .withOpacity(0.9),
+                                        color: _getAvatarColor(
+                                          name,
+                                        ).withOpacity(0.9),
                                       ),
                                     ),
                                   ],
@@ -1295,10 +1539,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                 children: [
                   const Text(
                     'Total',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   Text(
                     'Rp ${_formatNumber(totalAmount)}',
@@ -1365,12 +1606,16 @@ class _EventDetailScreenState extends State<EventDetailScreen>
 
   String _formatNumber(double amount) {
     if (amount == amount.roundToDouble()) {
-      return amount.toStringAsFixed(0).replaceAllMapped(
+      return amount
+          .toStringAsFixed(0)
+          .replaceAllMapped(
             RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
             (match) => '${match[1]}.',
           );
     }
-    return amount.toStringAsFixed(0).replaceAllMapped(
+    return amount
+        .toStringAsFixed(0)
+        .replaceAllMapped(
           RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
           (match) => '${match[1]}.',
         );
@@ -1378,8 +1623,18 @@ class _EventDetailScreenState extends State<EventDetailScreen>
 
   String _getMonthName(int month) {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
-      'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'Mei',
+      'Jun',
+      'Jul',
+      'Agu',
+      'Sep',
+      'Okt',
+      'Nov',
+      'Des',
     ];
     return months[month - 1];
   }

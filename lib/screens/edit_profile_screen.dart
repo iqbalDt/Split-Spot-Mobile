@@ -52,8 +52,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       if (doc.exists) {
         final data = doc.data()!;
-        _phoneController.text = data['phone'] ?? '';
-        _bioController.text = data['bio'] ?? '';
+        _phoneController.text = data['phone']?.toString() ?? '';
+        _bioController.text = data['bio']?.toString() ?? '';
         // If Firestore has a photoURL and Auth doesn't, use Firestore's
         if (_currentPhotoUrl == null || _currentPhotoUrl!.isEmpty) {
           _currentPhotoUrl = data['photoURL'];
@@ -573,7 +573,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       icon: Icons.info_outline,
                       maxLines: 3,
                     ),
-                    SizedBox(height: 36),
+                    SizedBox(height: 20),
+
 
                     // Save Button
                     SizedBox(
