@@ -10,64 +10,13 @@ class PrivacySecurityScreen extends StatefulWidget {
 
 class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
   final User? _currentUser = FirebaseAuth.instance.currentUser;
-  bool _isLoading = true;
-
-  bool _profileVisibility = true;
-  bool _dataSharing = false;
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _loadSettings();
   }
 
-  Future<void> _loadSettings() async {
-    if (_currentUser == null) return;
-
-    try {
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(_currentUser!.uid)
-          .get();
-
-      if (doc.exists && doc.data()!.containsKey('privacySettings')) {
-        final saved = doc.data()!['privacySettings'] as Map<String, dynamic>;
-        setState(() {
-          _profileVisibility = saved['profileVisibility'] ?? true;
-          _dataSharing = saved['dataSharing'] ?? false;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading privacy settings: $e');
-    }
-
-    if (mounted) {
-      setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _updatePrivacySetting(String key, bool value) async {
-    if (_currentUser == null) return;
-
-    setState(() {
-      if (key == 'profileVisibility') _profileVisibility = value;
-      if (key == 'dataSharing') _dataSharing = value;
-    });
-
-    try {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(_currentUser!.uid)
-          .set({
-        'privacySettings': {
-          'profileVisibility': _profileVisibility,
-          'dataSharing': _dataSharing,
-        },
-      }, SetOptions(merge: true));
-    } catch (e) {
-      debugPrint('Error saving privacy setting: $e');
-    }
-  }
 
   void _showChangePasswordSheet() {
     final currentPassController = TextEditingController();
@@ -621,32 +570,6 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
                   ]),
                   SizedBox(height: 24),
 
-                  // Privacy Section
-                  _buildSectionHeader('Privacy'),
-                  SizedBox(height: 8),
-                  _buildCard([
-                    _buildSwitchTile(
-                      icon: Icons.visibility_rounded,
-                      iconColor: Color(0xFF2196F3),
-                      title: 'Profile Visibility',
-                      subtitle:
-                          'Allow other users to see your profile details',
-                      value: _profileVisibility,
-                      onChanged: (val) =>
-                          _updatePrivacySetting('profileVisibility', val),
-                    ),
-                    Divider(height: 1, color: Colors.grey[200], indent: 56),
-                    _buildSwitchTile(
-                      icon: Icons.analytics_rounded,
-                      iconColor: Color(0xFF9C27B0),
-                      title: 'Analytics Data Sharing',
-                      subtitle:
-                          'Help improve SplitSpot by sharing usage data',
-                      value: _dataSharing,
-                      onChanged: (val) =>
-                          _updatePrivacySetting('dataSharing', val),
-                    ),
-                  ]),
                   SizedBox(height: 24),
 
                   // Login Activity
@@ -789,57 +712,6 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
     );
   }
 
-  Widget _buildSwitchTile({
-    required IconData icon,
-    required Color iconColor,
-    required String title,
-    required String subtitle,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-  }) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: iconColor, size: 20),
-          ),
-          SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.black87,
-                  ),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-                ),
-              ],
-            ),
-          ),
-          Switch(
-            value: value,
-            onChanged: onChanged,
-            activeColor: Color(0xFF4CAF50),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildInfoTile({
     required IconData icon,

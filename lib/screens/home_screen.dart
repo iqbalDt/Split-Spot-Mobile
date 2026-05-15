@@ -42,7 +42,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ])));
             }
             final docs = snapshot.data?.docs ?? [];
-            if (docs.isEmpty) return SizedBox(height: 400, child: _buildEmptyState());
+            if (docs.isEmpty) return SizedBox(height: MediaQuery.of(context).size.height * 0.65, child: _buildEmptyState());
             docs.sort((a, b) {
               final aD = a.data() as Map<String, dynamic>; final bD = b.data() as Map<String, dynamic>;
               final aT = aD['createdAt'] as Timestamp?; final bT = bD['createdAt'] as Timestamp?;
@@ -50,7 +50,7 @@ class _HomeScreenState extends State<HomeScreen> {
               return bT.compareTo(aT);
             });
             final activeDocs = docs.where((d) { final data = d.data() as Map<String, dynamic>; return data['status'] != 'Completed'; }).toList();
-            if (activeDocs.isEmpty) return SizedBox(height: 400, child: _buildEmptyState());
+            if (activeDocs.isEmpty) return SizedBox(height: MediaQuery.of(context).size.height * 0.65, child: _buildEmptyState());
             return ListView.builder(padding: const EdgeInsets.fromLTRB(16, 4, 16, 16), shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
               itemCount: activeDocs.length,
               itemBuilder: (c, i) { final id = activeDocs[i].id; final data = activeDocs[i].data() as Map<String, dynamic>; return _buildEventCard(c, id, data, i); });

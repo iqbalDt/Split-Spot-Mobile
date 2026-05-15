@@ -108,7 +108,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
     content: Text('Event "$n" akan dihapus permanen dari riwayat. Tindakan ini tidak bisa dibatalkan.', style: GoogleFonts.poppins(color: AppColors.textBody, fontSize: 14)),
     actions: [
       TextButton(onPressed: () => Navigator.pop(dc, false), child: Text('Batal', style: GoogleFonts.poppins(color: AppColors.textSecondary, fontWeight: FontWeight.w600))),
-      ElevatedButton(onPressed: () => Navigator.pop(dc, true), style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 0),
+      ElevatedButton(onPressed: () => Navigator.pop(dc, true), style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 0),
         child: Text('Hapus', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600))),
     ],
   ));

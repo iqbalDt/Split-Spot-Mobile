@@ -178,7 +178,25 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     String participantName,
     double amount,
     int participantIndex,
-  ) {
+  ) async {
+    final userId = _eventData['userId'] ?? FirebaseAuth.instance.currentUser?.uid;
+    String? creatorBankName;
+    String? creatorBankAccount;
+
+    // Pre-fetch bank info
+    if (userId != null) {
+      try {
+        final doc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
+        creatorBankName = doc.data()?['bankName']?.toString();
+        creatorBankAccount = doc.data()?['bankAccount']?.toString();
+      } catch (_) {}
+    }
+
+    if (!mounted) return;
+
+    final bool hasBank = creatorBankName != null && creatorBankName.isNotEmpty
+        && creatorBankAccount != null && creatorBankAccount.isNotEmpty;
+
     final isPaid =
         (_eventData['participants'] as List?)?.elementAt(participantIndex)
             is Map
@@ -196,16 +214,13 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         bool isUpdating = false;
         String? qrisString;
         String? errorMessage;
-        bool isLoadingQris = true;
-        bool hasQrisError = false;
-        String? bankName;
-        String? bankAccount;
-        bool isLoadingBank = true;
+        bool isLoadingQris = hasBank;
+        bool hasQrisError = !hasBank;
 
         return StatefulBuilder(
           builder: (builderContext, setSheetState) {
-            // Fetch once
-            if (isLoadingQris && qrisString == null && !hasQrisError) {
+            // Fetch QRIS only if bank info exists
+            if (hasBank && isLoadingQris && qrisString == null && !hasQrisError) {
               _generateXenditQRIS(amount, participantName).then((result) {
                 if (builderContext.mounted) {
                   setSheetState(() {
@@ -219,28 +234,6 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                   });
                 }
               });
-
-              // Fetch creator's bank info
-              final userId = _eventData['userId'] ?? FirebaseAuth.instance.currentUser?.uid;
-              if (userId != null) {
-                FirebaseFirestore.instance.collection('users').doc(userId).get().then((doc) {
-                  if (builderContext.mounted) {
-                    setSheetState(() {
-                      if (doc.exists) {
-                        bankName = doc.data()?['bankName']?.toString();
-                        bankAccount = doc.data()?['bankAccount']?.toString();
-                      }
-                      isLoadingBank = false;
-                    });
-                  }
-                }).catchError((_) {
-                  if (builderContext.mounted) {
-                    setSheetState(() => isLoadingBank = false);
-                  }
-                });
-              } else {
-                isLoadingBank = false;
-              }
             }
             return Container(
               padding: const EdgeInsets.all(24),
@@ -306,61 +299,87 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                       ],
                     ),
                     child: Center(
-                      child: isLoadingQris
-                          ? const CircularProgressIndicator(
-                              color: Color(0xFF388E3C),
-                            )
-                          : (qrisString != null
-                                ? QrImageView(
-                                    data: qrisString!,
-                                    version: QrVersions.auto,
-                                    size: 180.0,
-                                  )
-                                : Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.error_outline,
-                                          size: 32,
-                                          color: Colors.red[300],
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          'Gagal memuat QRIS',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.grey[700],
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          errorMessage ?? 'Unknown error',
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            color: Colors.red[400],
-                                          ),
-                                          textAlign: TextAlign.center,
-                                          maxLines: 4,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ],
+                      child: !hasBank
+                          ? Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.account_balance_wallet_outlined,
+                                    size: 36,
+                                    color: Colors.orange[400],
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    'Rekening Belum Diisi',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.grey[700],
                                     ),
-                                  )),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Atur rekening / e-wallet di halaman Profile',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey[500],
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              ),
+                            )
+                          : isLoadingQris
+                              ? const CircularProgressIndicator(
+                                  color: Color(0xFF388E3C),
+                                )
+                              : (qrisString != null
+                                    ? QrImageView(
+                                        data: qrisString!,
+                                        version: QrVersions.auto,
+                                        size: 180.0,
+                                      )
+                                    : Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.error_outline,
+                                              size: 32,
+                                              color: Colors.red[300],
+                                            ),
+                                            const SizedBox(height: 8),
+                                            Text(
+                                              'Gagal memuat QRIS',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.grey[700],
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              errorMessage ?? 'Unknown error',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                color: Colors.red[400],
+                                              ),
+                                              textAlign: TextAlign.center,
+                                              maxLines: 4,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
+                                        ),
+                                      )),
                     ),
                   ),
                   const SizedBox(height: 20),
                   // Bank info box
-                  if (isLoadingBank)
-                    const Center(
-                      child: SizedBox(
-                        width: 20, height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF388E3C)),
-                      ),
-                    )
-                  else if (bankName != null && bankName!.isNotEmpty)
+                  if (hasBank)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       margin: const EdgeInsets.only(bottom: 20),
@@ -380,7 +399,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                           const SizedBox(width: 8),
                           Flexible(
                             child: Text(
-                              '$bankName : ${bankAccount ?? '-'}',
+                              '$creatorBankName : ${creatorBankAccount ?? '-'}',
                               style: const TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.bold,

@@ -7,27 +7,27 @@ class HelpSupportScreen extends StatelessWidget {
     {
       'question': 'How do I create a new event?',
       'answer':
-          'Tap the green "+" button at the bottom of the screen. Fill in the event details like name, location, and date. Then add items and participants to start splitting the bill.',
+          'Tap the green "+" button at the bottom of the screen. Fill in the event name, location, Google Maps link (optional), and date. Then add participants, menu items, and review the split result before saving.',
     },
     {
       'question': 'How does bill splitting work?',
       'answer':
-          'After creating an event and adding items, you assign each item to the participants who consumed it. SplitSpot will automatically calculate how much each person owes based on their share of the items.',
+          'After creating an event and adding menu items, you assign each item to the participants who ordered it. SplitSpot will automatically calculate how much each person owes based on their share. Tax/service charges can also be applied globally.',
     },
     {
       'question': 'How do I track payments?',
       'answer':
-          'In the event detail screen, you can see each participant\'s payment status. Mark payments as "Paid" when someone has settled their share. You\'ll get a notification when everyone has paid.',
+          'In the event detail screen, you can see each participant\'s payment status. Use the QRIS button to generate a payment QR code, or toggle the payment status manually. Admin participants are automatically marked as paid. When everyone has paid, the event is marked as completed.',
     },
     {
-      'question': 'Can I invite participants to an event?',
+      'question': 'What is the Admin (Penanggung Jawab) feature?',
       'answer':
-          'Yes! When creating an event, you can add participants by entering their names. In the future, we\'ll support sending invite links directly to other SplitSpot users.',
+          'When adding participants, you can mark someone as Admin — the person who pays the bill upfront. Admins are automatically marked as paid and will not have a QRIS payment code generated. You can set yourself as Admin via the banner, or toggle it for any participant. Multiple admins are supported.',
     },
     {
-      'question': 'How do I edit or delete an event?',
+      'question': 'How do I delete an event?',
       'answer':
-          'Open the event from your Home screen and tap on the event card. From the event detail view, you can modify event details or remove the event entirely.',
+          'Completed events appear in the Activity (Riwayat) tab. To delete one, swipe the event card to the left and confirm the deletion. Please note that events cannot be edited once created, and deletion is permanent.',
     },
     {
       'question': 'Is my data secure?',
@@ -193,11 +193,11 @@ class HelpSupportScreen extends StatelessWidget {
                     icon: Icons.email_rounded,
                     iconColor: Color(0xFF2196F3),
                     title: 'Email Support',
-                    subtitle: 'support@splitspot.app',
+                    subtitle: 'iqbaldinata12345@gmail.com',
                     onTap: () async {
                       final uri = Uri(
                         scheme: 'mailto',
-                        path: 'support@splitspot.app',
+                        path: 'iqbaldinata12345@gmail.com',
                         queryParameters: {
                           'subject': 'SplitSpot Support Request',
                         },
@@ -209,13 +209,13 @@ class HelpSupportScreen extends StatelessWidget {
                   ),
                   Divider(height: 1, color: Colors.grey[200]),
                   _buildContactTile(
-                    icon: Icons.chat_bubble_rounded,
-                    iconColor: Color(0xFF4CAF50),
-                    title: 'WhatsApp',
-                    subtitle: '+62 812-0000-0000',
+                    icon: Icons.camera_alt_rounded,
+                    iconColor: Color(0xFFE1306C),
+                    title: 'Instagram',
+                    subtitle: '@iqbaal.dt',
                     onTap: () async {
                       final uri = Uri.parse(
-                          'https://wa.me/6281200000000?text=Hi,%20I%20need%20help%20with%20SplitSpot');
+                          'https://www.instagram.com/iqbaal.dt?igsh=MXcyZXl2cWluYnQ1dQ%3D%3D&utm_source=qr');
                       if (await canLaunchUrl(uri)) {
                         await launchUrl(uri,
                             mode: LaunchMode.externalApplication);
@@ -249,32 +249,6 @@ class HelpSupportScreen extends StatelessWidget {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                  ),
-                  Divider(height: 1, color: Colors.grey[200]),
-                  _buildActionTile(
-                    icon: Icons.star_rounded,
-                    iconColor: Color(0xFFFF9800),
-                    title: 'Rate SplitSpot',
-                    subtitle: 'Love the app? Leave us a review!',
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Row(
-                            children: [
-                              Icon(Icons.construction_rounded,
-                                  color: Colors.white, size: 20),
-                              SizedBox(width: 8),
-                              Text('Play Store link coming soon!'),
-                            ],
-                          ),
-                          backgroundColor: Color(0xFF607D8B),
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                          margin: EdgeInsets.all(16),
-                        ),
-                      );
-                    },
                   ),
                   Divider(height: 1, color: Colors.grey[200]),
                   _buildActionTile(
