@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-//import '../models/event_model.dart';
 import '../models/participant_model.dart';
 import '../models/bill_calculator.dart';
-//import 'payment_status_screen.dart';
 import 'dashboard_screen.dart';
 
 class ResultScreen extends StatefulWidget {

@@ -45,8 +45,9 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: WillPopScope(
-        onWillPop: () async { if (_navigatorKeys[_selectedIndex].currentState?.canPop() ?? false) { _navigatorKeys[_selectedIndex].currentState?.pop(); return false; } return true; },
+      body: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) { if (didPop) return; if (_navigatorKeys[_selectedIndex].currentState?.canPop() ?? false) { _navigatorKeys[_selectedIndex].currentState?.pop(); } else { Navigator.of(context).maybePop(); } },
         child: IndexedStack(index: _selectedIndex, children: _screens),
       ),
       bottomNavigationBar: Container(
